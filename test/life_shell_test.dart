@@ -5,6 +5,7 @@ import 'package:goal_tracker_poc/app/life_store.dart';
 import 'package:goal_tracker_poc/data/goal_repository.dart';
 import 'package:goal_tracker_poc/data/life_repository.dart';
 import 'package:goal_tracker_poc/domain/goal.dart';
+import 'package:goal_tracker_poc/domain/life_data.dart';
 import 'package:goal_tracker_poc/ui/goal_app.dart';
 
 void main() {
@@ -36,6 +37,74 @@ void main() {
     await tester.tap(find.text('Calendar').last);
     await tester.pumpAndSettle();
     expect(find.text('Blocked times are shown'), findsOneWidget);
+    expect(find.byKey(const Key('calendar-day-timeline')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile calendar adds and edits a timed block without crashing', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final lifeStore = LifeStore(MemoryLifeRepository());
+
+    await tester.pumpWidget(
+      GoalApp(
+        store: GoalStore(repository: MemoryGoalRepository()),
+        lifeStore: lifeStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Calendar').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('calendar-add-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Add to calendar'), findsWidgets);
+    await tester.enterText(
+      find.byKey(const Key('calendar-title-field')),
+      'Focus block',
+    );
+    await tester.tap(find.text('Blocked time'));
+    await tester.tap(find.byKey(const Key('calendar-save-button')));
+    await tester.pumpAndSettle();
+
+    expect(lifeStore.calendar.single.title, 'Focus block');
+    expect(lifeStore.calendar.single.kind, CalendarEntryKind.blockedTime);
+    expect(
+      find.byKey(Key('calendar-entry-${lifeStore.calendar.single.id}')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(
+      find.byKey(Key('calendar-entry-${lifeStore.calendar.single.id}')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Edit calendar item'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    Navigator.of(tester.element(find.text('Edit calendar item'))).pop();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile month calendar has no overflow', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      GoalApp(
+        store: GoalStore(repository: MemoryGoalRepository()),
+        lifeStore: LifeStore(MemoryLifeRepository()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Calendar').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Month'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('calendar-month-view')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

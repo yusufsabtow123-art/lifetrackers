@@ -8,6 +8,7 @@ import '../domain/life_data.dart';
 import '../domain/plan_calculator.dart';
 import '../platform/goal_notification_service.dart';
 import 'app_theme.dart';
+import 'life_calendar_page.dart';
 import 'life_goals_page.dart';
 import 'settings_page.dart';
 
@@ -210,7 +211,7 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
       goalStore: widget.goalStore,
       lifeStore: widget.lifeStore,
     ),
-    _Destination.calendar => CalendarPage(
+    _Destination.calendar => LifeCalendarPage(
       goalStore: widget.goalStore,
       lifeStore: widget.lifeStore,
     ),

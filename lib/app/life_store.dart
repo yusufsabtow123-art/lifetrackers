@@ -137,6 +137,7 @@ class LifeStore extends ChangeNotifier {
     required DateTime end,
     required CalendarEntryKind kind,
     String location = '',
+    CalendarRepeat repeat = CalendarRepeat.none,
   }) async {
     final entry = CalendarEntry(
       id: _id('calendar', _clock()),
@@ -146,10 +147,24 @@ class LifeStore extends ChangeNotifier {
       kind: kind,
       location: location.trim(),
       spaceId: activeSpaceId,
+      repeat: repeat,
     );
     _data = LifeData(
       tasks: _data.tasks,
       calendar: [..._data.calendar, entry],
+      spaces: _data.spaces,
+      activeSpaceId: activeSpaceId,
+      showBlockedTimes: _data.showBlockedTimes,
+    );
+    await _save();
+  }
+
+  Future<void> updateCalendarEntry(CalendarEntry entry) async {
+    _data = LifeData(
+      tasks: _data.tasks,
+      calendar: _data.calendar
+          .map((item) => item.id == entry.id ? entry : item)
+          .toList(),
       spaces: _data.spaces,
       activeSpaceId: activeSpaceId,
       showBlockedTimes: _data.showBlockedTimes,

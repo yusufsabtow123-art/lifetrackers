@@ -53,4 +53,42 @@ bad row
     expect(store.entriesFor(DateTime(2027, 2, 1)), isEmpty);
     expect(store.calendar, hasLength(1));
   });
+
+  test('daily blocked time appears at the right time on future days', () async {
+    final repository = MemoryLifeRepository();
+    final store = LifeStore(repository);
+    await store.load();
+    await store.addCalendarEntry(
+      title: 'Protected focus time',
+      start: DateTime(2027, 2, 1, 9, 30),
+      end: DateTime(2027, 2, 1, 10, 15),
+      kind: CalendarEntryKind.blockedTime,
+      repeat: CalendarRepeat.daily,
+    );
+
+    final entry = store.entriesFor(DateTime(2027, 2, 8)).single;
+    expect(entry.occurrenceStart(DateTime(2027, 2, 8)).hour, 9);
+    expect(entry.occurrenceStart(DateTime(2027, 2, 8)).minute, 30);
+    expect(entry.occurrenceEnd(DateTime(2027, 2, 8)).hour, 10);
+    expect(entry.occurrenceEnd(DateTime(2027, 2, 8)).minute, 15);
+  });
+
+  test('calendar entries can be edited without creating duplicates', () async {
+    final repository = MemoryLifeRepository();
+    final store = LifeStore(repository);
+    await store.load();
+    await store.addCalendarEntry(
+      title: 'Old title',
+      start: DateTime(2027, 3, 1, 8),
+      end: DateTime(2027, 3, 1, 9),
+      kind: CalendarEntryKind.event,
+    );
+
+    await store.updateCalendarEntry(
+      store.calendar.single.copyWith(title: 'Updated title'),
+    );
+
+    expect(store.calendar, hasLength(1));
+    expect(store.calendar.single.title, 'Updated title');
+  });
 }

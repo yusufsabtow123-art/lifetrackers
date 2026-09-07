@@ -129,6 +129,22 @@ class LifeTask {
 
 enum CalendarEntryKind { event, blockedTime }
 
+enum CalendarRepeat {
+  none('Does not repeat'),
+  daily('Every day'),
+  weekdays('Weekdays'),
+  weekly('Every week');
+
+  const CalendarRepeat(this.label);
+  final String label;
+
+  static CalendarRepeat parse(String? value) =>
+      CalendarRepeat.values.firstWhere(
+        (item) => item.name == value,
+        orElse: () => CalendarRepeat.none,
+      );
+}
+
 class CalendarEntry {
   const CalendarEntry({
     required this.id,
@@ -139,6 +155,7 @@ class CalendarEntry {
     this.location = '',
     this.enabled = true,
     this.spaceId = LifeSpace.personalId,
+    this.repeat = CalendarRepeat.none,
   });
 
   final String id;
@@ -149,12 +166,62 @@ class CalendarEntry {
   final String location;
   final bool enabled;
   final String spaceId;
+  final CalendarRepeat repeat;
 
   bool occursOn(DateTime day) {
+    if (repeat != CalendarRepeat.none) {
+      final occurrenceDay = DateTime(day.year, day.month, day.day);
+      final firstDay = DateTime(start.year, start.month, start.day);
+      if (occurrenceDay.isBefore(firstDay)) return false;
+      return switch (repeat) {
+        CalendarRepeat.none => false,
+        CalendarRepeat.daily => true,
+        CalendarRepeat.weekdays => occurrenceDay.weekday <= DateTime.friday,
+        CalendarRepeat.weekly => occurrenceDay.weekday == firstDay.weekday,
+      };
+    }
     final dayStart = DateTime(day.year, day.month, day.day);
     final dayEnd = dayStart.add(const Duration(days: 1));
     return start.isBefore(dayEnd) && end.isAfter(dayStart);
   }
+
+  DateTime occurrenceStart(DateTime day) {
+    if (repeat == CalendarRepeat.none) return start;
+    return DateTime(
+      day.year,
+      day.month,
+      day.day,
+      start.hour,
+      start.minute,
+      start.second,
+    );
+  }
+
+  DateTime occurrenceEnd(DateTime day) {
+    if (repeat == CalendarRepeat.none) return end;
+    return occurrenceStart(day).add(end.difference(start));
+  }
+
+  CalendarEntry copyWith({
+    String? title,
+    DateTime? start,
+    DateTime? end,
+    CalendarEntryKind? kind,
+    String? location,
+    bool? enabled,
+    String? spaceId,
+    CalendarRepeat? repeat,
+  }) => CalendarEntry(
+    id: id,
+    title: title ?? this.title,
+    start: start ?? this.start,
+    end: end ?? this.end,
+    kind: kind ?? this.kind,
+    location: location ?? this.location,
+    enabled: enabled ?? this.enabled,
+    spaceId: spaceId ?? this.spaceId,
+    repeat: repeat ?? this.repeat,
+  );
 
   Map<String, Object?> toJson() => {
     'id': id,
@@ -165,6 +232,7 @@ class CalendarEntry {
     'location': location,
     'enabled': enabled,
     'spaceId': spaceId,
+    'repeat': repeat.name,
   };
 
   factory CalendarEntry.fromJson(Map<String, Object?> json) => CalendarEntry(
@@ -179,6 +247,7 @@ class CalendarEntry {
     location: json['location'] as String? ?? '',
     enabled: json['enabled'] as bool? ?? true,
     spaceId: json['spaceId'] as String? ?? LifeSpace.personalId,
+    repeat: CalendarRepeat.parse(json['repeat'] as String?),
   );
 }
 
