@@ -64,7 +64,12 @@ class _LifeGoalsPageState extends State<LifeGoalsPage> {
   Widget build(BuildContext context) {
     final mobile = MediaQuery.sizeOf(context).width < 820;
     return Padding(
-      padding: EdgeInsets.fromLTRB(mobile ? 14 : 24, 22, mobile ? 14 : 24, 14),
+      padding: EdgeInsets.fromLTRB(
+        mobile ? 16 : 24,
+        mobile ? 18 : 22,
+        mobile ? 16 : 24,
+        14,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -575,7 +580,7 @@ class _GoalCard extends StatelessWidget {
                       child: Icon(
                         Icons.local_fire_department_outlined,
                         size: 16,
-                        color: Color(0xFFE07A6D),
+                        color: AppColors.danger,
                       ),
                     ),
                   Icon(
@@ -847,8 +852,8 @@ class _GoalColumn {
 Color _categoryColor(String category) => switch (category) {
   'Faith' => const Color(0xFFD8B84E),
   'Health' || 'Body' => const Color(0xFF62B98A),
-  'Mind' => const Color(0xFF7E9CCB),
-  'Finances' || 'Work' => const Color(0xFFB18AD1),
+  'Mind' => const Color(0xFFD4D0C7),
+  'Finances' || 'Work' => const Color(0xFFC58E45),
   _ => const Color(0xFF92959F),
 };
 

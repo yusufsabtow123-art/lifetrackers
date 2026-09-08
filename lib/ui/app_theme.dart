@@ -12,17 +12,18 @@ abstract final class AppColors {
   static const softGreen = Color(0xFFE8F5ED);
   static const softAmber = Color(0xFFFFF1DE);
   static const softRed = Color(0xFFFFEAE7);
-  // The dark palette mirrors the quiet charcoal hierarchy of the approved
-  // Windows design. Surfaces are separated mostly by tone; borders stay soft.
-  static const darkBackground = Color(0xFF18191D);
-  static const darkPanel = Color(0xFF1F2025);
-  static const darkRaised = Color(0xFF27282E);
-  static const darkBorder = Color(0xFF34353C);
-  static const darkText = Color(0xFFE3E4E9);
-  static const darkMuted = Color(0xFF9698A3);
-  static const darkSoftGreen = Color(0xFF1D342B);
-  static const darkSoftBlue = Color(0xFF27243A);
-  static const purple = Color(0xFF7774CD);
+  // Warm, low-contrast layers keep the interface quiet and let content lead.
+  static const darkBackground = Color(0xFF090A0B);
+  static const darkPanel = Color(0xFF0E0F10);
+  static const darkRaised = Color(0xFF171819);
+  static const darkBorder = Color(0xFF292A2C);
+  static const darkText = Color(0xFFF1F0EC);
+  static const darkMuted = Color(0xFFA4A39D);
+  static const darkSoftGreen = Color(0xFF13271C);
+  static const darkSoftBlue = Color(0xFF20211E);
+  static const yellow = Color(0xFFE0B84F);
+  static const success = Color(0xFF45A36B);
+  static const danger = Color(0xFFD95A57);
 }
 
 double _contrastRatio(Color first, Color second) {
@@ -67,12 +68,11 @@ ThemeData buildAppTheme({
   Color accentColor = AppColors.green,
 }) {
   final complementary = _complementaryColor(accentColor);
-  final effectiveAccent = brightness == Brightness.dark
-      ? Color.lerp(accentColor, AppColors.purple, .68)!
-      : accentColor;
+  final dark = brightness == Brightness.dark;
+  final effectiveAccent = dark ? AppColors.darkText : AppColors.navy;
   final scheme =
       ColorScheme.fromSeed(
-        seedColor: effectiveAccent,
+        seedColor: accentColor,
         brightness: brightness,
         surface: brightness == Brightness.dark
             ? AppColors.darkPanel
@@ -80,14 +80,29 @@ ThemeData buildAppTheme({
       ).copyWith(
         primary: effectiveAccent,
         onPrimary: _bestForeground(effectiveAccent),
-        secondary: complementary,
+        secondary: dark ? accentColor : complementary,
+        surfaceContainerLowest: dark
+            ? AppColors.darkBackground
+            : AppColors.warmWhite,
+        surfaceContainerLow: dark
+            ? AppColors.darkPanel
+            : const Color(0xFFF4F2ED),
+        surfaceContainer: dark ? AppColors.darkRaised : const Color(0xFFF0EEE8),
+        surfaceContainerHigh: dark
+            ? const Color(0xFF1D1E20)
+            : const Color(0xFFEAE7E0),
+        surfaceContainerHighest: dark
+            ? const Color(0xFF222326)
+            : const Color(0xFFE6E3DC),
         onSurface: brightness == Brightness.dark
             ? AppColors.darkText
             : AppColors.navy,
+        onSurfaceVariant: dark ? AppColors.darkMuted : AppColors.navyMuted,
         outline: brightness == Brightness.dark
             ? AppColors.darkBorder
             : AppColors.border,
-        error: const Color(0xFFC73B2E),
+        outlineVariant: dark ? AppColors.darkBorder : AppColors.border,
+        error: AppColors.danger,
       );
   final base = ThemeData(
     useMaterial3: true,
@@ -101,21 +116,21 @@ ThemeData buildAppTheme({
     textTheme: base.textTheme.copyWith(
       displaySmall: TextStyle(
         color: scheme.onSurface,
-        fontSize: 28,
+        fontSize: 26,
         height: 1.05,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.6,
       ),
       headlineMedium: TextStyle(
         color: scheme.onSurface,
-        fontSize: 24,
+        fontSize: 22,
         height: 1.1,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.5,
       ),
       titleLarge: TextStyle(
         color: scheme.onSurface,
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: FontWeight.w600,
       ),
       titleMedium: TextStyle(
@@ -132,7 +147,7 @@ ThemeData buildAppTheme({
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(8)),
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         side: BorderSide(color: scheme.outlineVariant),
       ),
     ),
@@ -140,7 +155,7 @@ ThemeData buildAppTheme({
       backgroundColor: scheme.surface,
       surfaceTintColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(12)),
+        borderRadius: BorderRadius.all(Radius.circular(14)),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -148,28 +163,28 @@ ThemeData buildAppTheme({
       fillColor: scheme.surfaceContainerHighest,
       contentPadding: EdgeInsets.symmetric(horizontal: 13, vertical: 12),
       border: OutlineInputBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(7)),
+        borderRadius: const BorderRadius.all(Radius.circular(9)),
         borderSide: BorderSide(color: scheme.outlineVariant),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(7)),
+        borderRadius: const BorderRadius.all(Radius.circular(9)),
         borderSide: BorderSide(color: scheme.outlineVariant),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size(0, 42),
+        minimumSize: const Size(0, 40),
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size(0, 42),
+        minimumSize: const Size(0, 40),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         side: BorderSide(color: scheme.outline),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
         foregroundColor: scheme.onSurface,
         textStyle: const TextStyle(fontWeight: FontWeight.w600),
       ),
@@ -193,9 +208,9 @@ ThemeData buildAppTheme({
       height: 66,
       elevation: 0,
       backgroundColor: brightness == Brightness.dark
-          ? const Color(0xFF15161A)
+          ? AppColors.darkPanel
           : Colors.white,
-      indicatorColor: scheme.primary.withValues(alpha: .17),
+      indicatorColor: Colors.transparent,
       labelTextStyle: WidgetStatePropertyAll(
         TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant),
       ),
@@ -212,7 +227,7 @@ ThemeData buildAppTheme({
       surfaceTintColor: Colors.transparent,
       modalBarrierColor: Colors.black.withValues(alpha: .68),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
     ),
   );
@@ -235,6 +250,10 @@ extension AppThemeContext on BuildContext {
       scheme.surface,
     );
   }
+
+  Color get appPending => AppColors.yellow;
+  Color get appSuccess => AppColors.success;
+  Color get appDanger => AppColors.danger;
 
   Color get appSoftAmber =>
       isDarkMode ? const Color(0xFF3F311C) : AppColors.softAmber;

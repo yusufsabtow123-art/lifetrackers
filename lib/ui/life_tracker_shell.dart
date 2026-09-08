@@ -10,6 +10,7 @@ import '../platform/goal_notification_service.dart';
 import 'app_theme.dart';
 import 'life_calendar_page.dart';
 import 'life_goals_page.dart';
+import 'life_icons.dart';
 import 'settings_page.dart';
 
 enum _Destination { today, goals, tasks, calendar, ai, more }
@@ -50,13 +51,15 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
           appBar: wide
               ? null
               : AppBar(
-                  toolbarHeight: 48,
+                  toolbarHeight: 50,
                   backgroundColor: context.appPanel,
                   surfaceTintColor: Colors.transparent,
                   titleSpacing: 14,
                   shape: Border(bottom: BorderSide(color: context.appBorder)),
                   title: Row(
                     children: [
+                      const LifeMark(size: 19),
+                      const SizedBox(width: 10),
                       Text(
                         _activeSpace.name,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -80,10 +83,16 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
                     ],
                   ),
                   actions: [
-                    IconButton(
-                      tooltip: 'Change space',
-                      onPressed: _showSpacePicker,
-                      icon: const Icon(Icons.unfold_more_rounded, size: 19),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: IconButton(
+                        tooltip: 'Change space',
+                        onPressed: _showSpacePicker,
+                        icon: const CircleAvatar(
+                          radius: 12,
+                          child: Text('YO', style: TextStyle(fontSize: 8)),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -130,7 +139,7 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
           ),
           bottomNavigationBar: wide
               ? null
-              : NavigationBar(
+              : _LifeBottomBar(
                   selectedIndex: switch (_destination) {
                     _Destination.today => 0,
                     _Destination.goals => 1,
@@ -138,7 +147,7 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
                     _Destination.calendar => 3,
                     _ => 4,
                   },
-                  onDestinationSelected: (index) => setState(() {
+                  onSelected: (index) => setState(() {
                     _destination = switch (index) {
                       0 => _Destination.today,
                       1 => _Destination.goals,
@@ -147,32 +156,6 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
                       _ => _Destination.more,
                     };
                   }),
-                  destinations: const [
-                    NavigationDestination(
-                      icon: Icon(Icons.today_outlined),
-                      selectedIcon: Icon(Icons.today_rounded),
-                      label: 'Today',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.flag_outlined),
-                      selectedIcon: Icon(Icons.flag_rounded),
-                      label: 'Goals',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.check_circle_outline_rounded),
-                      selectedIcon: Icon(Icons.check_circle_rounded),
-                      label: 'Tasks',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.calendar_month_outlined),
-                      selectedIcon: Icon(Icons.calendar_month_rounded),
-                      label: 'Calendar',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.grid_view_rounded),
-                      label: 'More',
-                    ),
-                  ],
                 ),
         );
       },
@@ -334,6 +317,84 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
   );
 }
 
+class _LifeBottomBar extends StatelessWidget {
+  const _LifeBottomBar({required this.selectedIndex, required this.onSelected});
+
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  static const _items = <(LifeGlyph, String)>[
+    (LifeGlyph.today, 'Today'),
+    (LifeGlyph.goals, 'Goals'),
+    (LifeGlyph.tasks, 'Tasks'),
+    (LifeGlyph.calendar, 'Calendar'),
+    (LifeGlyph.more, 'More'),
+  ];
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: Container(
+      height: 62,
+      decoration: BoxDecoration(
+        color: context.appPanel,
+        border: Border(top: BorderSide(color: context.appBorder)),
+      ),
+      child: Row(
+        children: [
+          for (var index = 0; index < _items.length; index++)
+            Expanded(
+              child: Semantics(
+                selected: selectedIndex == index,
+                button: true,
+                label: _items[index].$2,
+                child: InkWell(
+                  onTap: () => onSelected(index),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      LifeGlyphIcon(
+                        _items[index].$1,
+                        size: 22,
+                        selected: selectedIndex == index,
+                        color: selectedIndex == index
+                            ? context.appText
+                            : context.appMuted,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _items[index].$2,
+                        style: TextStyle(
+                          color: selectedIndex == index
+                              ? context.appText
+                              : context.appMuted,
+                          fontSize: 10,
+                          fontWeight: selectedIndex == index
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        width: selectedIndex == index ? 3 : 0,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: context.appText,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _DesktopTopBar extends StatelessWidget {
   const _DesktopTopBar({
     required this.space,
@@ -378,10 +439,6 @@ class _DesktopTopBar extends StatelessWidget {
           style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
         ),
         const Spacer(),
-        Icon(Icons.undo_rounded, size: 16, color: context.appMuted),
-        const SizedBox(width: 16),
-        Icon(Icons.download_outlined, size: 16, color: context.appMuted),
-        const SizedBox(width: 16),
         const CircleAvatar(
           radius: 11,
           child: Text('YO', style: TextStyle(fontSize: 8)),
@@ -411,18 +468,7 @@ class _DesktopNavigation extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Row(
               children: [
-                Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFE6E6EA), Color(0xFF7774CD)],
-                    ),
-                  ),
-                ),
+                const LifeMark(size: 18),
                 const SizedBox(width: 9),
                 Text(
                   'Life Tracker',
@@ -450,25 +496,25 @@ class _DesktopNavigation extends StatelessWidget {
           _NavItem(
             state: state,
             destination: _Destination.goals,
-            icon: Icons.flag_outlined,
+            glyph: LifeGlyph.goals,
             label: 'Goals',
           ),
           _NavItem(
             state: state,
             destination: _Destination.tasks,
-            icon: Icons.check_circle_outline_rounded,
+            glyph: LifeGlyph.tasks,
             label: 'Tasks',
           ),
           _NavItem(
             state: state,
             destination: _Destination.calendar,
-            icon: Icons.calendar_month_outlined,
+            glyph: LifeGlyph.calendar,
             label: 'Calendar',
           ),
           _NavItem(
             state: state,
             destination: _Destination.ai,
-            icon: Icons.auto_awesome_outlined,
+            glyph: LifeGlyph.sparkle,
             label: 'AI',
           ),
           const SizedBox(height: 14),
@@ -482,14 +528,14 @@ class _DesktopNavigation extends StatelessWidget {
           _NavItem(
             state: state,
             destination: _Destination.today,
-            icon: Icons.check_circle_outline_rounded,
+            glyph: LifeGlyph.today,
             label: "Today's tasks",
           ),
           const Spacer(),
           _NavItem(
             state: state,
             destination: _Destination.more,
-            icon: Icons.settings_outlined,
+            glyph: LifeGlyph.settings,
             label: 'Settings',
           ),
           Divider(color: context.appBorder, height: 20),
@@ -533,12 +579,12 @@ class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.state,
     required this.destination,
-    required this.icon,
+    required this.glyph,
     required this.label,
   });
   final _LifeTrackerShellState state;
   final _Destination destination;
-  final IconData icon;
+  final LifeGlyph glyph;
   final String label;
 
   @override
@@ -556,12 +602,11 @@ class _NavItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  size: 16,
-                  color: selected
-                      ? Theme.of(context).colorScheme.primary
-                      : context.appMuted,
+                LifeGlyphIcon(
+                  glyph,
+                  size: 17,
+                  selected: selected,
+                  color: selected ? context.appText : context.appMuted,
                 ),
                 const SizedBox(width: 9),
                 Text(
@@ -737,15 +782,10 @@ class _TasksPageState extends State<TasksPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(value: 0, label: Text('Today')),
-              ButtonSegment(value: 1, label: Text('Upcoming')),
-              ButtonSegment(value: 2, label: Text('All')),
-            ],
-            selected: {_filter},
-            onSelectionChanged: (value) =>
-                setState(() => _filter = value.first),
+          _TextTabs(
+            labels: const ['Today', 'Upcoming', 'All'],
+            selected: _filter,
+            onSelected: (value) => setState(() => _filter = value),
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -1314,12 +1354,15 @@ class _MorePage extends StatelessWidget {
     subtitle: 'Spaces, AI, appearance, notifications, and your local files.',
     child: ListView(
       children: [
+        const _GroupLabel('SPACES'),
         _SurfaceTile(
           icon: Icons.group_outlined,
           title: 'Spaces and people',
           subtitle: 'Personal and Shared Space',
           onTap: onSpaces,
         ),
+        const SizedBox(height: 22),
+        const _GroupLabel('TOOLS'),
         _SurfaceTile(
           icon: Icons.auto_awesome_outlined,
           title: 'AI',
@@ -1332,7 +1375,8 @@ class _MorePage extends StatelessWidget {
           subtitle: 'Appearance, notifications, goals, widgets, and files',
           onTap: onSettings,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 22),
+        const _GroupLabel('YOUR DATA'),
         _SurfaceTile(
           icon: Icons.description_outlined,
           title: 'Tasks and calendar file',
@@ -1452,30 +1496,25 @@ class _SummaryStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: context.appPanel,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: context.appBorder),
-    ),
-    padding: const EdgeInsets.symmetric(vertical: 18),
+    padding: const EdgeInsets.symmetric(vertical: 3),
     child: Row(
       children: [
         _metric(context, first, firstLabel),
-        Container(width: 1, height: 36, color: context.appBorder),
+        Container(width: 1, height: 26, color: context.appBorder),
         _metric(context, second, secondLabel),
       ],
     ),
   );
 
   Widget _metric(BuildContext context, String value, String label) => Expanded(
-    child: Column(
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
           value,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
+        const SizedBox(width: 6),
         Text(
           label,
           style: Theme.of(
@@ -1500,15 +1539,20 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     children: [
       Expanded(
-        child: Text(title, style: Theme.of(context).textTheme.titleLarge),
-      ),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        decoration: BoxDecoration(
-          color: context.appRaised,
-          borderRadius: BorderRadius.circular(20),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: context.appMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: .8,
+          ),
         ),
-        child: Text('$count', key: countKey),
+      ),
+      Text(
+        '$count',
+        key: countKey,
+        style: TextStyle(color: context.appMuted, fontSize: 11),
       ),
     ],
   );
@@ -1554,6 +1598,76 @@ class _EmptyCard extends StatelessWidget {
   );
 }
 
+class _GroupLabel extends StatelessWidget {
+  const _GroupLabel(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+    child: Text(
+      label,
+      style: TextStyle(
+        color: context.appMuted,
+        fontSize: 10,
+        fontWeight: FontWeight.w700,
+        letterSpacing: .9,
+      ),
+    ),
+  );
+}
+
+class _TextTabs extends StatelessWidget {
+  const _TextTabs({
+    required this.labels,
+    required this.selected,
+    required this.onSelected,
+  });
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      border: Border(bottom: BorderSide(color: context.appBorder)),
+    ),
+    child: Row(
+      children: [
+        for (var index = 0; index < labels.length; index++)
+          InkWell(
+            onTap: () => onSelected(index),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(2, 8, 24, 10),
+              child: Column(
+                children: [
+                  Text(
+                    labels[index],
+                    style: TextStyle(
+                      color: selected == index
+                          ? context.appText
+                          : context.appMuted,
+                      fontWeight: selected == index
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    height: 1.5,
+                    width: selected == index ? 26 : 0,
+                    color: context.appText,
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
 class _SurfaceTile extends StatelessWidget {
   const _SurfaceTile({
     required this.icon,
@@ -1569,38 +1683,27 @@ class _SurfaceTile extends StatelessWidget {
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+    padding: EdgeInsets.zero,
     child: Material(
-      color: context.appPanel,
-      borderRadius: BorderRadius.circular(8),
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: context.appBorder),
+            border: Border(bottom: BorderSide(color: context.appBorder)),
           ),
-          padding: const EdgeInsets.all(15),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 13),
           child: Row(
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: context.appRaised,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(icon, size: 20),
-              ),
-              const SizedBox(width: 13),
+              Icon(icon, size: 18, color: context.appMuted),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 2),
                     Text(
