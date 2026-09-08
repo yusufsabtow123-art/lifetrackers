@@ -83,4 +83,29 @@ void main() {
       closeTo(152.2 / 604, 0.0001),
     );
   });
+
+  test('long schedules and selected weekdays keep exact day positions', () {
+    final goal = Goal(
+      id: 'long-plan',
+      name: 'Long plan',
+      status: GoalStatus.active,
+      createdAt: DateTime(2020, 1, 1),
+      updatedAt: DateTime(2020, 1, 1),
+      plan: GoalPlan(
+        totalAmount: 100000,
+        unit: 'items',
+        startDate: DateTime(2020, 1, 1),
+        deadline: DateTime(2120, 12, 31),
+        activeWeekdays: const {DateTime.monday, DateTime.wednesday},
+        wholeUnits: true,
+        acceptedDailyPace: 20,
+      ),
+    );
+
+    expect(
+      calculator.actionForDate(goal, DateTime(2100, 6, 14)),
+      greaterThan(0),
+    );
+    expect(calculator.actionForDate(goal, DateTime(2100, 6, 15)), 0);
+  });
 }

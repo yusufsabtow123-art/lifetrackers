@@ -86,26 +86,24 @@ class GoalWidgetService {
         )
         .toList(growable: false);
 
-    final today = settings.widgetShowTodayActions
-        ? goals
-              .where(
-                (goal) =>
-                    included(goal) &&
-                    goal.plan != null &&
-                    goal.completionFor(store.today) == null &&
-                    store.calculator.actionForDate(goal, store.today) > 0,
-              )
-              .take(3)
-              .map(
-                (goal) => {
-                  'id': goal.id,
-                  'name': goal.name,
-                  'action':
-                      '${formatAmount(store.calculator.actionForDate(goal, store.today))} ${goal.plan!.unit}',
-                },
-              )
-              .toList(growable: false)
-        : const <Map<String, Object?>>[];
+    final today = <Map<String, Object?>>[];
+    if (settings.widgetShowTodayActions) {
+      for (final goal in goals) {
+        if (!included(goal) ||
+            goal.plan == null ||
+            goal.completionFor(store.today) != null) {
+          continue;
+        }
+        final amount = store.calculator.actionForDate(goal, store.today);
+        if (amount <= 0) continue;
+        today.add({
+          'id': goal.id,
+          'name': goal.name,
+          'action': '${formatAmount(amount)} ${goal.plan!.unit}',
+        });
+        if (today.length == 3) break;
+      }
+    }
 
     await HomeWidget.saveWidgetData('goal_cards_json', jsonEncode(cards));
     await HomeWidget.saveWidgetData('today_actions_json', jsonEncode(today));

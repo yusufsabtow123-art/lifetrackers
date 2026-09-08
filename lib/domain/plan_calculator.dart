@@ -60,7 +60,11 @@ class PlanCalculator {
     required DateTime deadline,
     required Set<int> activeWeekdays,
   }) {
-    final days = activeDatesBetween(start, deadline, activeWeekdays).length;
+    final days = _activeDayCount(start, deadline, activeWeekdays);
+    return _summaryForDayCount(amount, days);
+  }
+
+  PlanSummary _summaryForDayCount(double amount, int days) {
     if (days == 0) {
       return const PlanSummary(
         activeDayCount: 0,
@@ -106,24 +110,25 @@ class PlanCalculator {
   double actionForDate(Goal goal, DateTime date) {
     final plan = goal.plan;
     if (plan == null || goal.status != GoalStatus.active) return 0;
-    final activeDates = activeDatesBetween(
-      plan.startDate,
-      plan.deadline,
-      plan.activeWeekdays,
-    );
-    final index = activeDates.indexWhere((day) => isSameDate(day, date));
-    if (index < 0) return 0;
+    final normalizedDate = dateOnly(date);
+    final start = dateOnly(plan.startDate);
+    final deadline = dateOnly(plan.deadline);
+    if (normalizedDate.isBefore(start) ||
+        normalizedDate.isAfter(deadline) ||
+        !plan.activeWeekdays.contains(normalizedDate.weekday)) {
+      return 0;
+    }
+    final index =
+        _activeDayCount(start, normalizedDate, plan.activeWeekdays) - 1;
     if (!plan.wholeUnits) {
       return math.min(
         plan.acceptedDailyPace,
         plan.totalAmount - goal.completedAmount,
       );
     }
-    final summary = summarize(
-      amount: math.max(0, plan.totalAmount - plan.initialCompletedAmount),
-      start: plan.startDate,
-      deadline: plan.deadline,
-      activeWeekdays: plan.activeWeekdays,
+    final summary = _summaryForDayCount(
+      math.max(0, plan.totalAmount - plan.initialCompletedAmount),
+      _activeDayCount(start, deadline, plan.activeWeekdays),
     );
     final scheduled = index < summary.wholeUnitHighDays
         ? summary.wholeUnitHighAmount.toDouble()
@@ -143,27 +148,33 @@ class PlanCalculator {
       );
     }
 
-    final allDates = activeDatesBetween(
-      plan.startDate,
-      plan.deadline,
+    final start = dateOnly(plan.startDate);
+    final deadline = dateOnly(plan.deadline);
+    final normalizedToday = dateOnly(today);
+    final allDateCount = _activeDayCount(start, deadline, plan.activeWeekdays);
+    final elapsed = _activeDayCount(
+      start,
+      normalizedToday.isAfter(deadline) ? deadline : normalizedToday,
       plan.activeWeekdays,
     );
-    final elapsed = allDates
-        .where((date) => !date.isAfter(dateOnly(today)))
-        .length;
     final initial = plan.initialCompletedAmount
         .clamp(0.0, plan.totalAmount)
         .toDouble();
     final plannedAmount = math.max(0.0, plan.totalAmount - initial);
-    final expectedAmount = allDates.isEmpty
+    final expectedAmount = allDateCount == 0
         ? initial
-        : initial + plannedAmount * (elapsed / allDates.length).clamp(0.0, 1.0);
+        : initial + plannedAmount * (elapsed / allDateCount).clamp(0.0, 1.0);
     final expected = plan.totalAmount <= 0
         ? 0.0
         : (expectedAmount / plan.totalAmount).clamp(0.0, 1.0);
-    final remainingDates = allDates
-        .where((date) => !date.isBefore(dateOnly(today)))
-        .length;
+    final remainingStart = normalizedToday.isBefore(start)
+        ? start
+        : normalizedToday;
+    final remainingDates = _activeDayCount(
+      remainingStart,
+      deadline,
+      plan.activeWeekdays,
+    );
     final remainingAmount = math.max(
       0.0,
       plan.totalAmount - goal.completedAmount,
@@ -193,6 +204,34 @@ class PlanCalculator {
       paceIncrease: paceIncrease,
       progressGap: progressGap,
     );
+  }
+
+  int _activeDayCount(DateTime start, DateTime end, Set<int> activeWeekdays) {
+    final normalizedStart = dateOnly(start);
+    final normalizedEnd = dateOnly(end);
+    if (normalizedEnd.isBefore(normalizedStart) || activeWeekdays.isEmpty) {
+      return 0;
+    }
+    final utcStart = DateTime.utc(
+      normalizedStart.year,
+      normalizedStart.month,
+      normalizedStart.day,
+    );
+    final utcEnd = DateTime.utc(
+      normalizedEnd.year,
+      normalizedEnd.month,
+      normalizedEnd.day,
+    );
+    final inclusiveDays = utcEnd.difference(utcStart).inDays + 1;
+    final fullWeeks = inclusiveDays ~/ DateTime.daysPerWeek;
+    final remainingDays = inclusiveDays % DateTime.daysPerWeek;
+    var count = fullWeeks * activeWeekdays.length;
+    for (var offset = 0; offset < remainingDays; offset++) {
+      final weekday =
+          ((normalizedStart.weekday - 1 + offset) % DateTime.daysPerWeek) + 1;
+      if (activeWeekdays.contains(weekday)) count++;
+    }
+    return count;
   }
 }
 

@@ -64,6 +64,13 @@ flutter build appbundle --release --analyze-size
 flutter build apk --release --split-per-abi
 ```
 
-## Build without local toolchains
+Android downloads must be optimized release builds. Do not publish a debug APK:
+it contains debug snapshots, validation libraries, and several processor engines.
+For the side-by-side public preview, set `LIFE_TRACKER_PREVIEW_RELEASE=true`
+before the release build so it keeps the existing `.dev` package identity. The
+preferred direct download is the arm64 APK; keep the universal or other ABI
+packages only as clearly labelled compatibility downloads.
 
-The repository workflow at .github/workflows/build-apps.yml builds downloadable Android and Windows packages on GitHub. It provides the preferred arm64 APK separately from compatibility packages, records Android package sizes, and rejects an arm64 APK above the documented 25 MiB budget. This is the preferred proof-of-concept build path when the local computer is short on storage or does not have Visual Studio/Android tooling installed.
+Keep publishing split APKs for later Android updates. Flutter gives each processor
+build its own version code, so switching back to a universal APK can prevent a
+normal install-over update. Increase the build number for every public release.

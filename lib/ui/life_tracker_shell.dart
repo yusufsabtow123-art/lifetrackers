@@ -2070,11 +2070,15 @@ class _GoalAction {
   final double amount;
 }
 
-List<_GoalAction> _goalActions(GoalStore store, DateTime date) => [
-  for (final goal in store.goals)
-    if (!goal.isTrashed && store.calculator.actionForDate(goal, date) > 0)
-      _GoalAction(goal, store.calculator.actionForDate(goal, date)),
-];
+List<_GoalAction> _goalActions(GoalStore store, DateTime date) {
+  final actions = <_GoalAction>[];
+  for (final goal in store.goals) {
+    if (goal.isTrashed) continue;
+    final amount = store.calculator.actionForDate(goal, date);
+    if (amount > 0) actions.add(_GoalAction(goal, amount));
+  }
+  return actions;
+}
 
 String _friendlyDate(DateTime date) =>
     '${_weekdayName(date.weekday)}, ${_monthName(date.month)} ${date.day}';

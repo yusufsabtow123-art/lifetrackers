@@ -17,6 +17,8 @@ val releaseSigningConfigured = listOf(
 val releaseBuildRequested = gradle.startParameter.taskNames.any {
     it.contains("release", ignoreCase = true)
 }
+val previewRelease = System.getenv("LIFE_TRACKER_PREVIEW_RELEASE")
+    ?.equals("true", ignoreCase = true) == true
 
 if (releaseBuildRequested && !releaseSigningConfigured) {
     throw GradleException(
@@ -67,6 +69,19 @@ android {
             versionNameSuffix = "-dev"
         }
         release {
+            // The public preview is intentionally installed beside the permanent
+            // production app. This opt-in keeps its existing package identity
+            // while still using an optimized release build.
+            if (previewRelease) {
+                applicationIdSuffix = ".dev"
+                versionNameSuffix = "-dev"
+            }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             signingConfig = if (releaseSigningConfigured) {
                 signingConfigs.getByName("release")
             } else {
