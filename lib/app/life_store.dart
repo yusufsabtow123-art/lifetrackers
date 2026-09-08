@@ -107,6 +107,8 @@ class LifeStore extends ChangeNotifier {
     await _replaceTask(task.copyWith(completedDates: dates));
   }
 
+  Future<void> updateTask(LifeTask task) => _replaceTask(task);
+
   Future<void> deleteTask(LifeTask task) async {
     _data = LifeData(
       tasks: _data.tasks.where((item) => item.id != task.id).toList(),
@@ -138,6 +140,7 @@ class LifeStore extends ChangeNotifier {
     required CalendarEntryKind kind,
     String location = '',
     CalendarRepeat repeat = CalendarRepeat.none,
+    int? colorValue,
   }) async {
     final entry = CalendarEntry(
       id: _id('calendar', _clock()),
@@ -148,6 +151,7 @@ class LifeStore extends ChangeNotifier {
       location: location.trim(),
       spaceId: activeSpaceId,
       repeat: repeat,
+      colorValue: colorValue,
     );
     _data = LifeData(
       tasks: _data.tasks,

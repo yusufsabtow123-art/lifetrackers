@@ -54,8 +54,6 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(goal.name));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('goal-detail-view-toggle')));
-    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('add-many-steps-button')));
     await tester.tap(find.byKey(const Key('add-many-steps-button')));
     await tester.pumpAndSettle();

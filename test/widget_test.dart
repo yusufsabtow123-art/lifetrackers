@@ -50,6 +50,11 @@ void main() {
     expect(find.byKey(Key('toggle-urgent-${goal.id}')), findsNothing);
     await tester.tap(find.text(goal.name));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('edit-goal-details-button')),
+    );
+    await tester.tap(find.byKey(const Key('edit-goal-details-button')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('goal-urgent-switch')));
     await tester.pump(const Duration(milliseconds: 300));
 

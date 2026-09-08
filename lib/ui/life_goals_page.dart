@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app/goal_store.dart';
@@ -89,7 +91,7 @@ class _LifeGoalsPageState extends State<LifeGoalsPage> {
                 : _simplified
                 ? _SimplifiedGoals(
                     goals: _goals,
-                    columns: _columns,
+                    store: widget.store,
                     onOpen: _open,
                   )
                 : _Board(
@@ -272,7 +274,7 @@ class _ViewButton extends StatelessWidget {
   );
 }
 
-class _Board extends StatelessWidget {
+class _Board extends StatefulWidget {
   const _Board({
     required this.mobile,
     required this.goals,
@@ -288,27 +290,81 @@ class _Board extends StatelessWidget {
   final void Function(Goal, GoalStatus) onMove;
 
   @override
+  State<_Board> createState() => _BoardState();
+}
+
+class _BoardState extends State<_Board> {
+  final _scrollController = ScrollController();
+  Timer? _edgeScrollTimer;
+  int _edgeDirection = 0;
+
+  @override
+  void dispose() {
+    _edgeScrollTimer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _updateEdgeScroll(Offset globalPosition) {
+    if (!widget.mobile) return;
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox) return;
+    final local = renderObject.globalToLocal(globalPosition);
+    const edge = 58.0;
+    final nextDirection = local.dx < edge
+        ? -1
+        : local.dx > renderObject.size.width - edge
+        ? 1
+        : 0;
+    if (nextDirection == _edgeDirection) return;
+    _stopEdgeScroll();
+    if (nextDirection == 0) return;
+    _edgeDirection = nextDirection;
+    _edgeScrollTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+      if (!_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      final next = (position.pixels + _edgeDirection * 3.2).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      _scrollController.jumpTo(next);
+    });
+  }
+
+  void _stopEdgeScroll() {
+    _edgeScrollTimer?.cancel();
+    _edgeScrollTimer = null;
+    _edgeDirection = 0;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (mobile) {
+    if (widget.mobile) {
       final width = (MediaQuery.sizeOf(context).width * .84).clamp(
         272.0,
         342.0,
       );
       return ListView.separated(
         key: const Key('mobile-goal-board'),
+        controller: _scrollController,
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        itemCount: columns.length,
+        itemCount: widget.columns.length,
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) => SizedBox(
           width: width,
           child: _BoardColumn(
-            column: columns[index],
-            goals: goals
-                .where((goal) => columns[index].statuses.contains(goal.status))
+            column: widget.columns[index],
+            goals: widget.goals
+                .where(
+                  (goal) =>
+                      widget.columns[index].statuses.contains(goal.status),
+                )
                 .toList(),
-            onOpen: onOpen,
-            onMove: onMove,
+            onOpen: widget.onOpen,
+            onMove: widget.onMove,
+            onDragUpdate: _updateEdgeScroll,
+            onDragStopped: _stopEdgeScroll,
           ),
         ),
       );
@@ -316,20 +372,21 @@ class _Board extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var index = 0; index < columns.length; index++) ...[
+        for (var index = 0; index < widget.columns.length; index++) ...[
           Expanded(
             child: _BoardColumn(
-              column: columns[index],
-              goals: goals
+              column: widget.columns[index],
+              goals: widget.goals
                   .where(
-                    (goal) => columns[index].statuses.contains(goal.status),
+                    (goal) =>
+                        widget.columns[index].statuses.contains(goal.status),
                   )
                   .toList(),
-              onOpen: onOpen,
-              onMove: onMove,
+              onOpen: widget.onOpen,
+              onMove: widget.onMove,
             ),
           ),
-          if (index < columns.length - 1) const SizedBox(width: 12),
+          if (index < widget.columns.length - 1) const SizedBox(width: 12),
         ],
       ],
     );
@@ -342,12 +399,16 @@ class _BoardColumn extends StatelessWidget {
     required this.goals,
     required this.onOpen,
     required this.onMove,
+    this.onDragUpdate,
+    this.onDragStopped,
   });
 
   final _GoalColumn column;
   final List<Goal> goals;
   final ValueChanged<Goal> onOpen;
   final void Function(Goal, GoalStatus) onMove;
+  final ValueChanged<Offset>? onDragUpdate;
+  final VoidCallback? onDragStopped;
 
   @override
   Widget build(BuildContext context) => DragTarget<Goal>(
@@ -418,6 +479,11 @@ class _BoardColumn extends StatelessWidget {
                       final goal = goals[index];
                       return LongPressDraggable<Goal>(
                         data: goal,
+                        onDragUpdate: (details) =>
+                            onDragUpdate?.call(details.globalPosition),
+                        onDragEnd: (_) => onDragStopped?.call(),
+                        onDraggableCanceled: (_, _) => onDragStopped?.call(),
+                        onDragCompleted: () => onDragStopped?.call(),
                         feedback: Material(
                           color: Colors.transparent,
                           child: SizedBox(
@@ -577,48 +643,149 @@ class _GoalCard extends StatelessWidget {
 class _SimplifiedGoals extends StatelessWidget {
   const _SimplifiedGoals({
     required this.goals,
-    required this.columns,
+    required this.store,
     required this.onOpen,
   });
 
   final List<Goal> goals;
-  final List<_GoalColumn> columns;
+  final GoalStore store;
   final ValueChanged<Goal> onOpen;
 
   @override
-  Widget build(BuildContext context) => ListView(
-    children: [
-      for (final column in columns) ...[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(2, 10, 2, 8),
+  Widget build(BuildContext context) {
+    final sorted = [
+      ...goals,
+    ]..sort((a, b) => _statusOrder(a.status).compareTo(_statusOrder(b.status)));
+    return ListView.separated(
+      key: const Key('simplified-goal-list'),
+      padding: const EdgeInsets.only(bottom: 12),
+      itemCount: sorted.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 7),
+      itemBuilder: (context, index) {
+        final goal = sorted[index];
+        return _SimpleGoalRow(
+          key: Key('simplified-goal-${goal.id}'),
+          goal: goal,
+          store: store,
+          onTap: () => onOpen(goal),
+        );
+      },
+    );
+  }
+}
+
+class _SimpleGoalRow extends StatelessWidget {
+  const _SimpleGoalRow({
+    super.key,
+    required this.goal,
+    required this.store,
+    required this.onTap,
+  });
+
+  final Goal goal;
+  final GoalStore store;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final action = store.calculator.actionForDate(goal, store.today);
+    final nextStep = _nextStep(goal);
+    final progress = goal.plan == null
+        ? '${goal.completedStepCount} of ${goal.steps.length} steps'
+        : '${_number(goal.completedAmount)} of ${_number(goal.plan!.totalAmount)} ${goal.plan!.unit}';
+    final next = action > 0
+        ? 'Today: ${_number(action)} ${goal.plan!.unit}'
+        : nextStep == null
+        ? (goal.plan == null ? 'Add a plan' : 'No action due today')
+        : 'Next: $nextStep';
+    return Material(
+      color: context.appPanel,
+      borderRadius: BorderRadius.circular(9),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(9),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: context.appBorder.withValues(alpha: .8)),
+            borderRadius: BorderRadius.circular(9),
+          ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: column.color, width: 1.5),
+              Padding(
+                padding: const EdgeInsets.only(top: 5),
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: _categoryColor(goal.category),
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                column.label,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      goal.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      progress,
+                      style: TextStyle(fontSize: 11, color: context.appMuted),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      next,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _simpleStatus(goal.status),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: context.appMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 11),
+                  Text(
+                    goal.plan == null
+                        ? 'No date'
+                        : _shortDate(goal.plan!.deadline),
+                    style: TextStyle(fontSize: 10, color: context.appMuted),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: context.appMuted,
               ),
             ],
           ),
         ),
-        for (final goal in goals.where(
-          (goal) => column.statuses.contains(goal.status),
-        ))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _GoalCard(goal: goal, onTap: () => onOpen(goal)),
-          ),
-      ],
-    ],
-  );
+      ),
+    );
+  }
 }
 
 class _EmptyGoals extends StatelessWidget {
@@ -705,4 +872,27 @@ String _shortDate(DateTime date) {
     'Dec',
   ];
   return '${months[date.month - 1]} ${date.day}, ${date.year}';
+}
+
+int _statusOrder(GoalStatus status) => switch (status) {
+  GoalStatus.active => 0,
+  GoalStatus.planned || GoalStatus.ideas => 1,
+  GoalStatus.paused => 2,
+  GoalStatus.completed => 3,
+  GoalStatus.abandoned => 4,
+};
+
+String _simpleStatus(GoalStatus status) => switch (status) {
+  GoalStatus.active => 'In progress',
+  GoalStatus.planned || GoalStatus.ideas => 'To do',
+  GoalStatus.paused => 'Paused',
+  GoalStatus.completed => 'Completed',
+  GoalStatus.abandoned => 'Stopped',
+};
+
+String? _nextStep(Goal goal) {
+  for (final step in goal.steps) {
+    if (!step.isCompleted) return step.title;
+  }
+  return null;
 }

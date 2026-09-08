@@ -37,17 +37,9 @@ class GoalProgressSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('Progress', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 4),
-          Text(
-            'Track the amount, check off the steps, or use both.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           if (plan == null) ...[
-            const Text(
-              'No amount target yet. You can use the checklist by itself or '
-              'add an amount and schedule.',
-            ),
+            const Text('No amount target yet.'),
             const SizedBox(height: 10),
             OutlinedButton.icon(
               key: const Key('add-amount-target-button'),

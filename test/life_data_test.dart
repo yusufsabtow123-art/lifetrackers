@@ -21,6 +21,25 @@ void main() {
     expect(store.tasks.single.isDoneOn(DateTime(2027, 1, 6)), isFalse);
   });
 
+  test('tasks can be edited without losing their completion history', () async {
+    final repository = MemoryLifeRepository();
+    final store = LifeStore(repository, clock: () => DateTime(2027, 1, 5, 12));
+    await store.load();
+    await store.addTask(
+      title: 'Old task name',
+      dueAt: DateTime(2027, 1, 5),
+      repeat: TaskRepeat.daily,
+    );
+    await store.toggleTaskForDate(store.tasks.single, DateTime(2027, 1, 5));
+
+    await store.updateTask(
+      store.tasks.single.copyWith(title: 'Updated task name'),
+    );
+
+    expect(store.tasks.single.title, 'Updated task name');
+    expect(store.tasks.single.isDoneOn(DateTime(2027, 1, 5)), isTrue);
+  });
+
   test('imports a changing blocked-time schedule', () async {
     final repository = MemoryLifeRepository();
     final store = LifeStore(repository);
@@ -90,5 +109,21 @@ bad row
 
     expect(store.calendar, hasLength(1));
     expect(store.calendar.single.title, 'Updated title');
+  });
+
+  test('calendar colors survive storage and editing', () async {
+    final original = CalendarEntry(
+      id: 'colored-entry',
+      title: 'Focus time',
+      start: DateTime(2027, 3, 1, 8),
+      end: DateTime(2027, 3, 1, 9),
+      kind: CalendarEntryKind.blockedTime,
+      colorValue: 0xFF45C7BA,
+    );
+
+    final restored = CalendarEntry.fromJson(original.toJson());
+
+    expect(restored.colorValue, 0xFF45C7BA);
+    expect(restored.copyWith(colorValue: 0xFF9B66D9).colorValue, 0xFF9B66D9);
   });
 }

@@ -830,9 +830,7 @@ class _TimelineCanvas extends StatelessWidget {
       (occurrence.endMinute - occurrence.startMinute) / 60 * hourHeight - 2,
     );
     final blocked = occurrence.entry.kind == CalendarEntryKind.blockedTime;
-    final color = blocked
-        ? const Color(0xFFD16A61)
-        : Theme.of(context).colorScheme.primary;
+    final color = _calendarEntryColor(context, occurrence.entry);
     return Positioned(
       key: Key('calendar-entry-${occurrence.entry.id}'),
       top: top,
@@ -1023,10 +1021,7 @@ class _MonthDayCell extends StatelessWidget {
     final colors = <Color>[
       if (hasGoal) Theme.of(context).colorScheme.primary,
       if (hasTask) const Color(0xFF55C891),
-      if (entries.any((entry) => entry.kind == CalendarEntryKind.event))
-        const Color(0xFFF1B84B),
-      if (entries.any((entry) => entry.kind == CalendarEntryKind.blockedTime))
-        const Color(0xFFD16A61),
+      ...entries.map((entry) => _calendarEntryColor(context, entry)),
     ];
     return Padding(
       padding: const EdgeInsets.all(2),
@@ -1141,9 +1136,7 @@ class _SelectedDaySummary extends StatelessWidget {
                   Container(
                     width: 3,
                     height: 24,
-                    color: entry.kind == CalendarEntryKind.blockedTime
-                        ? const Color(0xFFD16A61)
-                        : Theme.of(context).colorScheme.primary,
+                    color: _calendarEntryColor(context, entry),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -1189,6 +1182,7 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
   late DateTime _date;
   late CalendarEntryKind _kind;
   late CalendarRepeat _repeat;
+  late int _colorValue;
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
   String? _error;
@@ -1206,6 +1200,11 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
         : _dateOnly(entry.start);
     _kind = entry?.kind ?? CalendarEntryKind.event;
     _repeat = entry?.repeat ?? CalendarRepeat.none;
+    _colorValue =
+        entry?.colorValue ??
+        (entry?.kind == CalendarEntryKind.blockedTime
+            ? 0xFFD16A61
+            : 0xFF6F72E8);
     _startTime = entry == null
         ? widget.initialTime ?? const TimeOfDay(hour: 9, minute: 0)
         : TimeOfDay.fromDateTime(entry.start);
@@ -1306,6 +1305,11 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
                         ? 'What is this time protected for?'
                         : 'Event name',
                   ),
+                ),
+                const SizedBox(height: 12),
+                _CalendarColorField(
+                  color: Color(_colorValue),
+                  onTap: _pickColor,
                 ),
                 const SizedBox(height: 12),
                 _EditorRow(
@@ -1440,6 +1444,7 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
         kind: _kind,
         location: _location.text,
         repeat: _repeat,
+        colorValue: _colorValue,
       );
     } else {
       await widget.store.updateCalendarEntry(
@@ -1450,10 +1455,21 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
           kind: _kind,
           location: _location.text.trim(),
           repeat: _repeat,
+          colorValue: _colorValue,
         ),
       );
     }
     if (mounted) Navigator.pop(context);
+  }
+
+  Future<void> _pickColor() async {
+    final chosen = await showDialog<Color>(
+      context: context,
+      builder: (context) => _CalendarColorDialog(initial: Color(_colorValue)),
+    );
+    if (chosen != null && mounted) {
+      setState(() => _colorValue = chosen.toARGB32());
+    }
   }
 
   Future<void> _delete() async {
@@ -1480,6 +1496,257 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
     await widget.store.deleteCalendarEntry(entry);
     if (mounted) Navigator.pop(context);
   }
+}
+
+class _CalendarColorField extends StatelessWidget {
+  const _CalendarColorField({required this.color, required this.onTap});
+
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    key: const Key('calendar-color-button'),
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(8),
+    child: Container(
+      constraints: const BoxConstraints(minHeight: 54),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: context.appRaised,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.appBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: .35)),
+            ),
+          ),
+          const SizedBox(width: 11),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Color', style: TextStyle(fontSize: 9)),
+                SizedBox(height: 2),
+                Text(
+                  'Choose a preset or any color',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, size: 18),
+        ],
+      ),
+    ),
+  );
+}
+
+class _CalendarColorDialog extends StatefulWidget {
+  const _CalendarColorDialog({required this.initial});
+
+  final Color initial;
+
+  @override
+  State<_CalendarColorDialog> createState() => _CalendarColorDialogState();
+}
+
+class _CalendarColorDialogState extends State<_CalendarColorDialog> {
+  static const _presets = <int>[
+    0xFFE05D62,
+    0xFFF09A48,
+    0xFFF1C94A,
+    0xFF70C982,
+    0xFF45C7BA,
+    0xFF4FA3E3,
+    0xFF6F72E8,
+    0xFF9B66D9,
+    0xFFD46FA6,
+    0xFFB8785E,
+    0xFF89909B,
+    0xFFD16A61,
+  ];
+
+  late HSVColor _selected;
+  final _spectrumKey = GlobalKey();
+  final _hueKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = HSVColor.fromColor(widget.initial);
+  }
+
+  void _setSaturationAndValue(Offset point) {
+    final box = _spectrumKey.currentContext?.findRenderObject();
+    if (box is! RenderBox) return;
+    final size = box.size;
+    setState(() {
+      _selected = _selected
+          .withSaturation((point.dx / size.width).clamp(0.0, 1.0))
+          .withValue((1 - point.dy / size.height).clamp(0.0, 1.0));
+    });
+  }
+
+  void _setHue(double x) {
+    final box = _hueKey.currentContext?.findRenderObject();
+    if (box is! RenderBox) return;
+    setState(() {
+      _selected = _selected.withHue((x / box.size.width).clamp(0.0, 1.0) * 360);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Choose color'),
+    content: SizedBox(
+      width: 380,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Presets', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (final value in _presets)
+                  InkWell(
+                    key: Key('calendar-color-$value'),
+                    onTap: () => setState(
+                      () => _selected = HSVColor.fromColor(Color(value)),
+                    ),
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Color(value),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _selected.toColor().toARGB32() == value
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: .18),
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text('Any color', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 10),
+            GestureDetector(
+              key: _spectrumKey,
+              onTapDown: (details) =>
+                  _setSaturationAndValue(details.localPosition),
+              onPanUpdate: (details) =>
+                  _setSaturationAndValue(details.localPosition),
+              child: SizedBox(
+                key: const Key('calendar-color-spectrum'),
+                height: 150,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: ColoredBox(
+                        color: HSVColor.fromAHSV(
+                          1,
+                          _selected.hue,
+                          1,
+                          1,
+                        ).toColor(),
+                      ),
+                    ),
+                    const Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.white, Colors.transparent],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Colors.black],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment(
+                        _selected.saturation * 2 - 1,
+                        (1 - _selected.value) * 2 - 1,
+                      ),
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: const [BoxShadow(blurRadius: 3)],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              key: _hueKey,
+              onTapDown: (details) => _setHue(details.localPosition.dx),
+              onPanUpdate: (details) => _setHue(details.localPosition.dx),
+              child: Container(
+                key: const Key('calendar-color-hue'),
+                height: 22,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFFFF0000),
+                      Color(0xFFFFFF00),
+                      Color(0xFF00FF00),
+                      Color(0xFF00FFFF),
+                      Color(0xFF0000FF),
+                      Color(0xFFFF00FF),
+                      Color(0xFFFF0000),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        key: const Key('calendar-color-done'),
+        onPressed: () => Navigator.pop(context, _selected.toColor()),
+        child: const Text('Done'),
+      ),
+    ],
+  );
 }
 
 class _KindButton extends StatelessWidget {
@@ -1817,6 +2084,14 @@ String _time(DateTime date) {
       ? date.hour - 12
       : date.hour;
   return '$hour:${date.minute.toString().padLeft(2, '0')} ${date.hour >= 12 ? 'PM' : 'AM'}';
+}
+
+Color _calendarEntryColor(BuildContext context, CalendarEntry entry) {
+  final value = entry.colorValue;
+  if (value != null) return Color(value);
+  return entry.kind == CalendarEntryKind.blockedTime
+      ? const Color(0xFFD16A61)
+      : Theme.of(context).colorScheme.primary;
 }
 
 String _weekdayName(int day) => const [

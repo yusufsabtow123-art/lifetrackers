@@ -9,6 +9,8 @@ import 'create_goal_dialog.dart';
 import 'goal_progress_section.dart';
 import 'reminder_dialog.dart';
 
+enum _GoalMenuAction { editDetails, reminder, plan, removePlan, trash }
+
 Future<void> showGoalDetailsSheet(
   BuildContext context,
   GoalStore store,
@@ -51,14 +53,6 @@ class _GoalDetailsSheet extends StatefulWidget {
 }
 
 class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
-  late bool _detailed;
-
-  @override
-  void initState() {
-    super.initState();
-    _detailed = widget.settings.isGoalDetailed(widget.goalId);
-  }
-
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -134,31 +128,42 @@ class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
                               ],
                             ),
                           ),
-                          Column(
-                            children: [
-                              IconButton(
-                                key: const Key('goal-detail-view-toggle'),
-                                tooltip: _detailed
-                                    ? 'Use Simple view'
-                                    : 'Use Detailed view',
-                                onPressed: () {
-                                  setState(() => _detailed = !_detailed);
-                                  widget.settings.setGoalDetailed(
-                                    goal.id,
-                                    _detailed,
-                                  );
-                                },
-                                icon: Icon(
-                                  _detailed
-                                      ? Icons.view_list_rounded
-                                      : Icons.view_agenda_outlined,
+                          PopupMenuButton<_GoalMenuAction>(
+                            key: const Key('goal-details-menu'),
+                            tooltip: 'Goal options',
+                            onSelected: (action) =>
+                                _handleMenuAction(action, goal),
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: _GoalMenuAction.editDetails,
+                                child: Text('Edit details'),
+                              ),
+                              PopupMenuItem(
+                                value: _GoalMenuAction.reminder,
+                                child: Text(
+                                  goal.reminder == null
+                                      ? 'Add reminder'
+                                      : 'Edit reminder',
                                 ),
                               ),
-                              Text(
-                                _detailed ? 'Detailed' : 'Simple',
-                                style: Theme.of(context).textTheme.labelSmall,
+                              PopupMenuItem(
+                                value: _GoalMenuAction.plan,
+                                child: Text(
+                                  plan == null ? 'Add plan' : 'Change plan',
+                                ),
+                              ),
+                              if (plan != null)
+                                const PopupMenuItem(
+                                  value: _GoalMenuAction.removePlan,
+                                  child: Text('Remove plan'),
+                                ),
+                              const PopupMenuDivider(),
+                              const PopupMenuItem(
+                                value: _GoalMenuAction.trash,
+                                child: Text('Move to Trash'),
                               ),
                             ],
+                            icon: const Icon(Icons.more_horiz_rounded),
                           ),
                           IconButton(
                             tooltip: 'Close',
@@ -167,41 +172,8 @@ class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 22),
-                      DropdownButtonFormField<GoalStatus>(
-                        initialValue: goal.status,
-                        decoration: const InputDecoration(
-                          labelText: 'Board column',
-                          helperText: 'This changes where the goal appears.',
-                        ),
-                        items: [
-                          for (final status in GoalStatus.visibleValues(
-                            showAbandoned:
-                                widget.showAbandoned ||
-                                goal.status == GoalStatus.abandoned,
-                          ))
-                            DropdownMenuItem(
-                              value: status,
-                              child: Text(status.label),
-                            ),
-                        ],
-                        onChanged: (status) {
-                          if (status != null) {
-                            widget.store.moveGoal(goal.id, status);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        goal.status.description,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
                       const SizedBox(height: 18),
-                      _GoalOrganizationSection(
-                        goal: goal,
-                        store: widget.store,
-                        settings: widget.settings,
-                      ),
+                      _TodayActionCard(goal: goal, store: widget.store),
                       const SizedBox(height: 20),
                       GoalProgressSection(
                         goal: goal,
@@ -217,45 +189,18 @@ class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
                           );
                         },
                       ),
-                      if (_detailed && plan != null) ...[
+                      if (plan != null) ...[
                         const SizedBox(height: 24),
-                        _HealthDetails(
-                          health: health,
-                          goal: goal,
-                          settings: widget.settings,
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          '${_date(plan.startDate)} → ${_date(plan.deadline)}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        const SizedBox(height: 18),
-                        OutlinedButton.icon(
-                          onPressed: () => _confirmRemovePlan(goal),
-                          icon: const Icon(Icons.undo_rounded),
-                          label: const Text('Remove plan and return to Ideas'),
-                        ),
+                        _ScheduleSummary(health: health, goal: goal),
                       ],
-                      const SizedBox(height: 22),
-                      _ReminderSummary(
-                        goal: goal,
-                        settings: widget.settings,
-                        store: widget.store,
-                      ),
-                      const SizedBox(height: 22),
-                      Divider(color: context.appBorder),
-                      TextButton.icon(
-                        key: const Key('trash-goal-button'),
-                        onPressed: () => _confirmTrash(goal),
-                        icon: Icon(
-                          Icons.delete_outline_rounded,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        label: Text(
-                          'Move goal to Trash',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
+                      const SizedBox(height: 18),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          key: const Key('edit-goal-details-button'),
+                          onPressed: () => _showGoalSettings(goal),
+                          icon: const Icon(Icons.tune_rounded, size: 18),
+                          label: const Text('Edit goal details'),
                         ),
                       ),
                     ],
@@ -268,6 +213,41 @@ class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
       },
     );
   }
+
+  Future<void> _handleMenuAction(_GoalMenuAction action, Goal goal) async {
+    switch (action) {
+      case _GoalMenuAction.editDetails:
+        await _showGoalSettings(goal);
+      case _GoalMenuAction.reminder:
+        await showGoalReminderDialog(
+          context,
+          store: widget.store,
+          settings: widget.settings,
+          goalId: goal.id,
+        );
+      case _GoalMenuAction.plan:
+        final navigator = Navigator.of(context);
+        navigator.pop();
+        await showPlanGoalDialog(navigator.context, widget.store, goal.id);
+      case _GoalMenuAction.removePlan:
+        await _confirmRemovePlan(goal);
+      case _GoalMenuAction.trash:
+        await _confirmTrash(goal);
+    }
+  }
+
+  Future<void> _showGoalSettings(Goal goal) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (context) => _GoalSettingsSheet(
+      goalId: goal.id,
+      store: widget.store,
+      settings: widget.settings,
+      showAbandoned: widget.showAbandoned,
+    ),
+  );
 
   Future<void> _confirmTrash(Goal goal) async {
     final confirmed = await showDialog<bool>(
@@ -324,77 +304,193 @@ class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
   }
 }
 
-class _ReminderSummary extends StatelessWidget {
-  const _ReminderSummary({
-    required this.goal,
-    required this.settings,
-    required this.store,
-  });
+class _TodayActionCard extends StatelessWidget {
+  const _TodayActionCard({required this.goal, required this.store});
 
   final Goal goal;
-  final AppSettingsController settings;
   final GoalStore store;
 
   @override
   Widget build(BuildContext context) {
-    final reminder = goal.reminder;
-    final time = reminder == null
-        ? null
-        : TimeOfDay(hour: reminder.hour, minute: reminder.minute);
-    return Container(
-      padding: const EdgeInsets.all(16),
+    final plan = goal.plan;
+    if (plan == null) return const SizedBox.shrink();
+    final completion = goal.completionFor(store.today);
+    final scheduled = store.calculator.actionForDate(goal, store.today);
+    if (scheduled <= 0 && completion == null) return const SizedBox.shrink();
+    final amount = completion?.amount ?? scheduled;
+    final done = completion != null;
+    return AnimatedContainer(
+      key: const Key('goal-today-action'),
+      duration: const Duration(milliseconds: 180),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: context.appSoftBlue,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.secondary.withValues(alpha: .35),
-        ),
+        color: done ? context.appSoftGreen : context.appSoftBlue,
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
-          Icon(
-            reminder == null
-                ? Icons.notifications_none_rounded
-                : Icons.notifications_active_rounded,
-            color: context.appBlueText,
+          Checkbox(
+            value: done,
+            onChanged: (_) => done
+                ? store.undoTodayAction(goal.id)
+                : store.completeTodayAction(goal.id),
           ),
-          const SizedBox(width: 11),
+          const SizedBox(width: 7),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Reminder',
+                  done ? 'Today’s action is done' : 'Today’s action',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  reminder == null
-                      ? 'No reminder set'
-                      : '${reminder.frequency.label} at ${time!.format(context)}',
+                  '${formatAmount(amount)} ${pluralize(plan.unit, amount)}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
           ),
-          OutlinedButton(
-            onPressed: settings.notificationsEnabled
-                ? () => showGoalReminderDialog(
-                    context,
-                    store: store,
-                    settings: settings,
-                    goalId: goal.id,
-                  )
-                : () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Reminders are turned off in Settings.'),
-                    ),
-                  ),
-            child: Text(reminder == null ? 'Add' : 'Edit'),
-          ),
         ],
       ),
     );
   }
+}
+
+class _ScheduleSummary extends StatelessWidget {
+  const _ScheduleSummary({required this.health, required this.goal});
+
+  final GoalHealthSnapshot health;
+  final Goal goal;
+
+  @override
+  Widget build(BuildContext context) {
+    final plan = goal.plan!;
+    final color = switch (health.health) {
+      GoalHealth.onTrack => context.appGreenText,
+      GoalHealth.atRisk => context.appWarningText,
+      GoalHealth.behind => context.appDangerText,
+      GoalHealth.none => context.appMuted,
+    };
+    final needsMore =
+        health.health == GoalHealth.atRisk ||
+        health.health == GoalHealth.behind;
+    return Container(
+      key: const Key('goal-schedule-summary'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.appPanel,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.appBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.schedule_rounded, size: 18, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  health.health.label,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: color),
+                ),
+              ),
+              Text(
+                'Due ${_date(plan.deadline)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+          const SizedBox(height: 11),
+          _MetricRow(
+            label: 'Current pace',
+            value:
+                '${formatAmount(plan.acceptedDailyPace)} ${pluralize(plan.unit, plan.acceptedDailyPace)} per active day',
+          ),
+          if (needsMore)
+            _MetricRow(
+              label: 'Pace needed now',
+              value:
+                  '${formatAmount(health.requiredDailyPace)} ${pluralize(plan.unit, health.requiredDailyPace)} per active day',
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalSettingsSheet extends StatelessWidget {
+  const _GoalSettingsSheet({
+    required this.goalId,
+    required this.store,
+    required this.settings,
+    required this.showAbandoned,
+  });
+
+  final String goalId;
+  final GoalStore store;
+  final AppSettingsController settings;
+  final bool showAbandoned;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: store,
+    builder: (context, _) {
+      final goal = store.goalById(goalId);
+      if (goal == null) return const SizedBox.shrink();
+      return FractionallySizedBox(
+        heightFactor: .82,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 540),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 2, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Edit goal details',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<GoalStatus>(
+                    key: const Key('goal-status-field'),
+                    initialValue: goal.status,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Status'),
+                    items: [
+                      for (final status in GoalStatus.visibleValues(
+                        showAbandoned:
+                            showAbandoned ||
+                            goal.status == GoalStatus.abandoned,
+                      ))
+                        DropdownMenuItem(
+                          value: status,
+                          child: Text(status.label),
+                        ),
+                    ],
+                    onChanged: (status) {
+                      if (status != null) store.moveGoal(goal.id, status);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _GoalOrganizationSection(
+                    goal: goal,
+                    store: store,
+                    settings: settings,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _GoalOrganizationSection extends StatelessWidget {
@@ -522,101 +618,6 @@ class _GoalOrganizationSection extends StatelessWidget {
   }
 }
 
-class _HealthDetails extends StatelessWidget {
-  const _HealthDetails({
-    required this.health,
-    required this.goal,
-    required this.settings,
-  });
-
-  final GoalHealthSnapshot health;
-  final Goal goal;
-  final AppSettingsController settings;
-
-  @override
-  Widget build(BuildContext context) {
-    final (color, background, message) = switch (health.health) {
-      GoalHealth.onTrack => (
-        context.appGreenText,
-        context.appSoftGreen,
-        'Your accepted plan reaches the deadline.',
-      ),
-      GoalHealth.atRisk => (
-        context.appWarningText,
-        context.appSoftAmber,
-        'A small pace increase is needed.',
-      ),
-      GoalHealth.behind => (
-        context.appDangerText,
-        context.appSoftRed,
-        'A major pace increase or later deadline is needed.',
-      ),
-      GoalHealth.none => (
-        context.appMuted,
-        context.appSoftBlue,
-        'Health is shown for active scheduled goals.',
-      ),
-    };
-    final plan = goal.plan;
-    if (plan == null) return const SizedBox.shrink();
-    String amount(double value) =>
-        '${formatAmount(value)} ${pluralize(plan.unit, value)}';
-    return AnimatedBuilder(
-      animation: settings,
-      builder: (context, _) => Container(
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: ExpansionTile(
-          key: PageStorageKey('goal-health-${goal.id}'),
-          initiallyExpanded: settings.isGoalHealthExpanded(goal.id),
-          onExpansionChanged: (expanded) =>
-              settings.setGoalHealthExpanded(goal.id, expanded),
-          shape: const Border(),
-          collapsedShape: const Border(),
-          title: Text(
-            health.health.label,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: color),
-          ),
-          subtitle: Text(message),
-          childrenPadding: const EdgeInsets.fromLTRB(17, 0, 17, 17),
-          children: [
-            if (health.health != GoalHealth.none) ...[
-              _MetricRow(
-                label: 'Actual progress',
-                value: amount(goal.completedAmount),
-              ),
-              _MetricRow(
-                label: 'Expected progress today',
-                value: amount(health.expectedProgress * plan.totalAmount),
-              ),
-              _MetricRow(
-                label: 'Schedule difference',
-                value: health.progressGap <= 0
-                    ? 'On schedule'
-                    : '${amount(health.progressGap * plan.totalAmount)} behind',
-              ),
-              _MetricRow(
-                label: 'Accepted pace',
-                value: '${amount(plan.acceptedDailyPace)} per active day',
-              ),
-              _MetricRow(
-                label: 'Required pace',
-                value: health.requiredDailyPace.isInfinite
-                    ? 'Deadline passed'
-                    : '${amount(health.requiredDailyPace)} per active day',
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _MetricRow extends StatelessWidget {
   const _MetricRow({required this.label, required this.value});
 
@@ -632,7 +633,15 @@ class _MetricRow extends StatelessWidget {
           Expanded(
             child: Text(label, style: Theme.of(context).textTheme.bodySmall),
           ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(width: 10),
+          Flexible(
+            flex: 2,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
         ],
       ),
     );

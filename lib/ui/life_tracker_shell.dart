@@ -630,6 +630,7 @@ class TodayPage extends StatelessWidget {
     final today = goalStore.today;
     final goals = _goalActions(goalStore, today);
     final tasks = lifeStore.tasksFor(today);
+    final unfinishedTasks = tasks.where((task) => !task.isDoneOn(today)).length;
     final entries = lifeStore.entriesFor(today);
     return _PageFrame(
       title: 'Today',
@@ -638,8 +639,7 @@ class TodayPage extends StatelessWidget {
         padding: EdgeInsets.zero,
         children: [
           _SummaryStrip(
-            first:
-                '${goals.length + tasks.where((task) => !task.isDoneOn(today)).length}',
+            first: '${goals.length + unfinishedTasks}',
             firstLabel: 'left to do',
             second: '${entries.length}',
             secondLabel: 'on calendar',
@@ -666,7 +666,11 @@ class TodayPage extends StatelessWidget {
                     : goalStore.undoTodayAction(action.goal.id),
               ),
           const SizedBox(height: 22),
-          _SectionTitle(title: 'Tasks', count: tasks.length),
+          _SectionTitle(
+            title: 'Tasks',
+            count: unfinishedTasks,
+            countKey: const Key('today-task-count'),
+          ),
           const SizedBox(height: 9),
           if (tasks.isEmpty)
             const _EmptyCard(
@@ -676,7 +680,13 @@ class TodayPage extends StatelessWidget {
             )
           else
             for (final task in tasks)
-              _TaskTile(task: task, store: lifeStore, date: today),
+              _TaskTile(
+                task: task,
+                store: lifeStore,
+                date: today,
+                onOpen: () =>
+                    _showTaskEditor(context, lifeStore, goalStore, task: task),
+              ),
           if (entries.isNotEmpty) ...[
             const SizedBox(height: 22),
             _SectionTitle(title: 'Schedule', count: entries.length),
@@ -749,7 +759,16 @@ class _TasksPageState extends State<TasksPage> {
                 : ListView(
                     children: [
                       for (final task in tasks)
-                        _TaskTile(task: task, store: widget.lifeStore),
+                        _TaskTile(
+                          task: task,
+                          store: widget.lifeStore,
+                          onOpen: () => _showTaskEditor(
+                            context,
+                            widget.lifeStore,
+                            widget.goalStore,
+                            task: task,
+                          ),
+                        ),
                     ],
                   ),
           ),
@@ -1469,9 +1488,14 @@ class _SummaryStrip extends StatelessWidget {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, required this.count});
+  const _SectionTitle({
+    required this.title,
+    required this.count,
+    this.countKey,
+  });
   final String title;
   final int count;
+  final Key? countKey;
   @override
   Widget build(BuildContext context) => Row(
     children: [
@@ -1484,7 +1508,7 @@ class _SectionTitle extends StatelessWidget {
           color: context.appRaised,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text('$count'),
+        child: Text('$count', key: countKey),
       ),
     ],
   );
@@ -1609,17 +1633,20 @@ class _ActionTile extends StatelessWidget {
     required this.subtitle,
     required this.done,
     this.onToggle,
+    this.onTap,
   });
   final IconData icon;
   final String title;
   final String subtitle;
   final bool done;
   final VoidCallback? onToggle;
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => _SurfaceTile(
     icon: icon,
     title: title,
     subtitle: subtitle,
+    onTap: onTap,
     trailing: IconButton(
       onPressed: onToggle,
       icon: Icon(
@@ -1633,10 +1660,16 @@ class _ActionTile extends StatelessWidget {
 }
 
 class _TaskTile extends StatelessWidget {
-  const _TaskTile({required this.task, required this.store, this.date});
+  const _TaskTile({
+    required this.task,
+    required this.store,
+    this.date,
+    this.onOpen,
+  });
   final LifeTask task;
   final LifeStore store;
   final DateTime? date;
+  final VoidCallback? onOpen;
   @override
   Widget build(BuildContext context) {
     final details = <String>[
@@ -1665,6 +1698,7 @@ class _TaskTile extends StatelessWidget {
         icon: Icons.check_circle_outline_rounded,
         title: task.title,
         subtitle: details.isEmpty ? 'No date' : details.join('  ·  '),
+        onTap: onOpen,
         done: date == null ? task.isCompleted : task.isDoneOn(date!),
         onToggle: () => date == null
             ? store.toggleTask(task)
@@ -1702,15 +1736,17 @@ class _CalendarTile extends StatelessWidget {
 Future<void> _showTaskEditor(
   BuildContext context,
   LifeStore store,
-  GoalStore goals,
-) async {
-  final title = TextEditingController();
-  final notes = TextEditingController();
-  final location = TextEditingController();
-  var due = goals.today;
-  var repeat = TaskRepeat.none;
-  String? goalId;
-  var assignee = '';
+  GoalStore goals, {
+  LifeTask? task,
+}) async {
+  final editing = task != null;
+  final title = TextEditingController(text: task?.title ?? '');
+  final notes = TextEditingController(text: task?.notes ?? '');
+  final location = TextEditingController(text: task?.location ?? '');
+  var due = task?.dueAt ?? goals.today;
+  var repeat = task?.repeat ?? TaskRepeat.none;
+  String? goalId = task?.goalId;
+  var assignee = task?.assignee ?? '';
   final activeSpace = store.spaces.firstWhere(
     (space) => space.id == store.activeSpaceId,
   );
@@ -1730,9 +1766,13 @@ Future<void> _showTaskEditor(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('New task', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                editing ? 'Edit task' : 'New task',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 16),
               TextField(
+                key: const Key('task-title-field'),
                 controller: title,
                 autofocus: true,
                 decoration: const InputDecoration(
@@ -1768,6 +1808,7 @@ Future<void> _showTaskEditor(
                   const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButtonFormField<TaskRepeat>(
+                      isExpanded: true,
                       initialValue: repeat,
                       items: [
                         for (final item in TaskRepeat.values)
@@ -1785,6 +1826,7 @@ Future<void> _showTaskEditor(
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String?>(
+                isExpanded: true,
                 initialValue: goalId,
                 items: [
                   const DropdownMenuItem<String?>(
@@ -1805,6 +1847,7 @@ Future<void> _showTaskEditor(
               const SizedBox(height: 10),
               if (activeSpace.isShared) ...[
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: assignee,
                   items: [
                     const DropdownMenuItem(
@@ -1833,20 +1876,36 @@ Future<void> _showTaskEditor(
               ),
               const SizedBox(height: 18),
               FilledButton(
+                key: const Key('task-save-button'),
                 onPressed: () {
                   if (title.text.trim().isEmpty) return;
-                  store.addTask(
-                    title: title.text,
-                    notes: notes.text,
-                    dueAt: due,
-                    repeat: repeat,
-                    goalId: goalId,
-                    location: location.text,
-                    assignee: assignee,
-                  );
+                  if (task == null) {
+                    store.addTask(
+                      title: title.text,
+                      notes: notes.text,
+                      dueAt: due,
+                      repeat: repeat,
+                      goalId: goalId,
+                      location: location.text,
+                      assignee: assignee,
+                    );
+                  } else {
+                    store.updateTask(
+                      task.copyWith(
+                        title: title.text.trim(),
+                        notes: notes.text.trim(),
+                        dueAt: due,
+                        repeat: repeat,
+                        goalId: goalId,
+                        clearGoal: goalId == null,
+                        location: location.text.trim(),
+                        assignee: assignee.trim(),
+                      ),
+                    );
+                  }
                   Navigator.pop(context);
                 },
-                child: const Text('Add task'),
+                child: Text(editing ? 'Save changes' : 'Add task'),
               ),
             ],
           ),
@@ -1854,6 +1913,7 @@ Future<void> _showTaskEditor(
       ),
     ),
   );
+  await Future<void>.delayed(const Duration(milliseconds: 350));
   title.dispose();
   notes.dispose();
   location.dispose();

@@ -64,9 +64,26 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
     final existing = widget.existingGoalId == null
         ? null
         : widget.store.goalById(widget.existingGoalId!);
-    if (existing != null) _nameController.text = existing.name;
-    _startDate = widget.store.today;
-    _deadline = widget.store.today.add(const Duration(days: 99));
+    if (existing != null) {
+      _nameController.text = existing.name;
+      final plan = existing.plan;
+      if (plan != null) {
+        _amountController.text = _editableAmount(plan.totalAmount);
+        _startingProgressController.text = _editableAmount(
+          existing.completedAmount,
+        );
+        _unitController.text = plan.unit;
+        _wholeUnits = plan.wholeUnits;
+        _startDate = plan.startDate;
+        _deadline = plan.deadline;
+      } else {
+        _startDate = widget.store.today;
+        _deadline = widget.store.today.add(const Duration(days: 99));
+      }
+    } else {
+      _startDate = widget.store.today;
+      _deadline = widget.store.today.add(const Duration(days: 99));
+    }
     _amountController.addListener(_refreshPlanningPreview);
     _startingProgressController.addListener(_refreshPlanningPreview);
     _unitController.addListener(_refreshPlanningPreview);

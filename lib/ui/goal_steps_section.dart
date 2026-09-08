@@ -35,7 +35,7 @@ class _GoalStepsSectionState extends State<GoalStepsSection> {
           children: [
             Expanded(
               child: Text(
-                'Checklist',
+                'Steps',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
@@ -45,11 +45,6 @@ class _GoalStepsSectionState extends State<GoalStepsSection> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
           ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Check a step when it is finished.',
-          style: Theme.of(context).textTheme.bodySmall,
         ),
         if (goal.steps.isNotEmpty) ...[
           const SizedBox(height: 10),

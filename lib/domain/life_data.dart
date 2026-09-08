@@ -156,6 +156,7 @@ class CalendarEntry {
     this.enabled = true,
     this.spaceId = LifeSpace.personalId,
     this.repeat = CalendarRepeat.none,
+    this.colorValue,
   });
 
   final String id;
@@ -167,6 +168,7 @@ class CalendarEntry {
   final bool enabled;
   final String spaceId;
   final CalendarRepeat repeat;
+  final int? colorValue;
 
   bool occursOn(DateTime day) {
     if (repeat != CalendarRepeat.none) {
@@ -211,6 +213,8 @@ class CalendarEntry {
     bool? enabled,
     String? spaceId,
     CalendarRepeat? repeat,
+    int? colorValue,
+    bool clearColor = false,
   }) => CalendarEntry(
     id: id,
     title: title ?? this.title,
@@ -221,6 +225,7 @@ class CalendarEntry {
     enabled: enabled ?? this.enabled,
     spaceId: spaceId ?? this.spaceId,
     repeat: repeat ?? this.repeat,
+    colorValue: clearColor ? null : colorValue ?? this.colorValue,
   );
 
   Map<String, Object?> toJson() => {
@@ -233,6 +238,7 @@ class CalendarEntry {
     'enabled': enabled,
     'spaceId': spaceId,
     'repeat': repeat.name,
+    'colorValue': colorValue,
   };
 
   factory CalendarEntry.fromJson(Map<String, Object?> json) => CalendarEntry(
@@ -248,6 +254,7 @@ class CalendarEntry {
     enabled: json['enabled'] as bool? ?? true,
     spaceId: json['spaceId'] as String? ?? LifeSpace.personalId,
     repeat: CalendarRepeat.parse(json['repeat'] as String?),
+    colorValue: (json['colorValue'] as num?)?.toInt(),
   );
 }
 
