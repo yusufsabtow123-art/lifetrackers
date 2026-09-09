@@ -40,6 +40,31 @@ void main() {
     expect(store.tasks.single.isDoneOn(DateTime(2027, 1, 5)), isTrue);
   });
 
+  test('task completion notes remain attached to the correct day', () async {
+    final repository = MemoryLifeRepository();
+    final store = LifeStore(repository, clock: () => DateTime(2027, 1, 5, 12));
+    await store.load();
+    await store.addTask(
+      title: 'Practice',
+      dueAt: DateTime(2027, 1, 5),
+      repeat: TaskRepeat.daily,
+    );
+
+    await store.completeTaskForDate(
+      store.tasks.single,
+      DateTime(2027, 1, 5),
+      note: 'Used the short exercise first.',
+    );
+
+    final reloaded = LifeData.fromJson(repository.data.toJson());
+    final task = reloaded.tasks.single;
+    expect(task.isDoneOn(DateTime(2027, 1, 5)), isTrue);
+    expect(
+      task.completionNoteFor(DateTime(2027, 1, 5))?.text,
+      'Used the short exercise first.',
+    );
+  });
+
   test('imports a changing blocked-time schedule', () async {
     final repository = MemoryLifeRepository();
     final store = LifeStore(repository);
@@ -125,5 +150,89 @@ bad row
 
     expect(restored.colorValue, 0xFF45C7BA);
     expect(restored.copyWith(colorValue: 0xFF9B66D9).colorValue, 0xFF9B66D9);
+  });
+
+  test(
+    'advanced schedule import preserves category details and skips duplicates',
+    () async {
+      final repository = MemoryLifeRepository();
+      final store = LifeStore(repository);
+      await store.load();
+      const row =
+          '2026-10-01\t11:00 PM\t7:00 AM\tWork\tBoston Scientific\tred\tweekly\tevent';
+
+      expect(await store.importBlockedSchedule(row), 1);
+      expect(await store.importBlockedSchedule(row), 0);
+
+      final entry = store.calendar.single;
+      expect(entry.location, 'Boston Scientific');
+      expect(entry.colorValue, 0xFFE05D62);
+      expect(entry.repeat, CalendarRepeat.weekly);
+      expect(entry.kind, CalendarEntryKind.event);
+    },
+  );
+
+  test('weekly overnight events appear on both calendar days', () async {
+    final entry = CalendarEntry(
+      id: 'overnight-work',
+      title: 'Work',
+      start: DateTime(2026, 9, 13, 23),
+      end: DateTime(2026, 9, 14, 7),
+      kind: CalendarEntryKind.event,
+      repeat: CalendarRepeat.weekly,
+    );
+
+    expect(entry.occursOn(DateTime(2026, 9, 13)), isTrue);
+    expect(entry.occursOn(DateTime(2026, 9, 14)), isTrue);
+    expect(
+      entry.occurrenceStart(DateTime(2026, 9, 14)),
+      DateTime(2026, 9, 13, 23),
+    );
+    expect(
+      entry.occurrenceEnd(DateTime(2026, 9, 14)),
+      DateTime(2026, 9, 14, 7),
+    );
+  });
+
+  test('custom weekly recurrence honors interval, weekdays, and end date', () {
+    final entry = CalendarEntry(
+      id: 'custom-weekly',
+      title: 'Workout',
+      start: DateTime(2026, 9, 7, 16, 45),
+      end: DateTime(2026, 9, 7, 17, 45),
+      kind: CalendarEntryKind.event,
+      repeat: CalendarRepeat.weekly,
+      repeatInterval: 2,
+      repeatWeekdays: const {DateTime.monday, DateTime.friday},
+      repeatUntil: DateTime(2026, 10, 5),
+    );
+
+    expect(entry.occursOn(DateTime(2026, 9, 7)), isTrue);
+    expect(entry.occursOn(DateTime(2026, 9, 11)), isTrue);
+    expect(entry.occursOn(DateTime(2026, 9, 14)), isFalse);
+    expect(entry.occursOn(DateTime(2026, 9, 21)), isTrue);
+    expect(entry.occursOn(DateTime(2026, 10, 9)), isFalse);
+  });
+
+  test('monthly and yearly recurrence survive storage', () {
+    final monthly = CalendarEntry(
+      id: 'monthly',
+      title: 'Monthly review',
+      start: DateTime(2026, 9, 9, 18),
+      end: DateTime(2026, 9, 9, 19),
+      kind: CalendarEntryKind.event,
+      repeat: CalendarRepeat.monthly,
+      repeatInterval: 2,
+    );
+    final restored = CalendarEntry.fromJson(monthly.toJson());
+
+    expect(restored.occursOn(DateTime(2026, 11, 9)), isTrue);
+    expect(restored.occursOn(DateTime(2026, 10, 9)), isFalse);
+    expect(
+      monthly
+          .copyWith(repeat: CalendarRepeat.yearly, repeatInterval: 1)
+          .occursOn(DateTime(2027, 9, 9)),
+      isTrue,
+    );
   });
 }

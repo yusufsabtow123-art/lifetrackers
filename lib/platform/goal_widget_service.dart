@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:home_widget/home_widget.dart';
 
@@ -35,19 +36,27 @@ Future<void> goalWidgetCallback(Uri? uri) async {
 }
 
 class GoalWidgetService {
-  Stream<Uri?> get clicks => HomeWidget.widgetClicked;
+  // These providers are Android home-screen widgets, not Windows widgets.
+  bool get _supported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  Stream<Uri?> get clicks =>
+      _supported ? HomeWidget.widgetClicked : const Stream<Uri?>.empty();
 
   Future<void> initialize() async {
+    if (!_supported) return;
     await HomeWidget.registerInteractivityCallback(goalWidgetCallback);
   }
 
-  Future<Uri?> initialUri() => HomeWidget.initiallyLaunchedFromHomeWidget();
+  Future<Uri?> initialUri() async =>
+      _supported ? await HomeWidget.initiallyLaunchedFromHomeWidget() : null;
 
   Future<void> sync(
     Iterable<Goal> goals,
     GoalStore store,
     AppSettingsController settings,
   ) async {
+    if (!_supported) return;
     final category = settings.widgetCategory;
     final visibleCategories = settings.data.enabledCategories;
     bool included(Goal goal) {
@@ -119,9 +128,13 @@ class GoalWidgetService {
     await HomeWidget.updateWidget(qualifiedAndroidName: _cardsProvider);
   }
 
-  Future<void> requestPinTodayWidget() =>
-      HomeWidget.requestPinWidget(qualifiedAndroidName: _todayProvider);
+  Future<void> requestPinTodayWidget() async {
+    if (!_supported) return;
+    await HomeWidget.requestPinWidget(qualifiedAndroidName: _todayProvider);
+  }
 
-  Future<void> requestPinCardsWidget() =>
-      HomeWidget.requestPinWidget(qualifiedAndroidName: _cardsProvider);
+  Future<void> requestPinCardsWidget() async {
+    if (!_supported) return;
+    await HomeWidget.requestPinWidget(qualifiedAndroidName: _cardsProvider);
+  }
 }

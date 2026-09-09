@@ -8,12 +8,15 @@ import '../domain/life_data.dart';
 import '../domain/plan_calculator.dart';
 import '../platform/goal_notification_service.dart';
 import 'app_theme.dart';
+import 'goal_details_sheet.dart';
 import 'life_calendar_page.dart';
 import 'life_goals_page.dart';
 import 'life_icons.dart';
+import 'life_quotes.dart';
 import 'settings_page.dart';
+import 'speech_input_button.dart';
 
-enum _Destination { today, goals, tasks, calendar, ai, more }
+enum _Destination { today, goals, tasks, calendar, spaces, ai, more }
 
 class LifeTrackerShell extends StatefulWidget {
   const LifeTrackerShell({
@@ -48,93 +51,38 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
         final wide = MediaQuery.sizeOf(context).width >= 820;
         final page = _page();
         return Scaffold(
-          appBar: wide
-              ? null
-              : AppBar(
-                  toolbarHeight: 50,
-                  backgroundColor: context.appPanel,
-                  surfaceTintColor: Colors.transparent,
-                  titleSpacing: 14,
-                  shape: Border(bottom: BorderSide(color: context.appBorder)),
-                  title: Row(
-                    children: [
-                      const LifeMark(size: 19),
-                      const SizedBox(width: 10),
-                      Text(
-                        _activeSpace.name,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: context.appMuted,
+          appBar: null,
+          body: ColoredBox(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            child: SafeArea(
+              child: Row(
+                children: [
+                  if (wide) _DesktopNavigation(state: this),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : LifeMotion.standard,
+                      switchInCurve: LifeMotion.curve,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween(
+                            begin: const Offset(.01, 0),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: child,
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 7),
-                        child: Text(
-                          '/',
-                          style: TextStyle(color: context.appMuted),
-                        ),
-                      ),
-                      Text(
-                        _title,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: IconButton(
-                        tooltip: 'Change space',
-                        onPressed: _showSpacePicker,
-                        icon: const CircleAvatar(
-                          radius: 12,
-                          child: Text('YO', style: TextStyle(fontSize: 8)),
-                        ),
+                      child: KeyedSubtree(
+                        key: ValueKey(_destination),
+                        child: page,
                       ),
                     ),
-                  ],
-                ),
-          body: SafeArea(
-            child: Row(
-              children: [
-                if (wide) _DesktopNavigation(state: this),
-                Expanded(
-                  child: Column(
-                    children: [
-                      if (wide)
-                        _DesktopTopBar(
-                          space: _activeSpace.name,
-                          page: _title,
-                          onSpace: _showSpacePicker,
-                        ),
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 190),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          transitionBuilder: (child, animation) =>
-                              FadeTransition(
-                                opacity: animation,
-                                child: SlideTransition(
-                                  position: Tween(
-                                    begin: const Offset(.01, 0),
-                                    end: Offset.zero,
-                                  ).animate(animation),
-                                  child: child,
-                                ),
-                              ),
-                          child: KeyedSubtree(
-                            key: ValueKey(_destination),
-                            child: page,
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           bottomNavigationBar: wide
@@ -162,29 +110,11 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
     );
   }
 
-  LifeSpace get _activeSpace => widget.lifeStore.spaces.firstWhere(
-    (space) => space.id == widget.lifeStore.activeSpaceId,
-    orElse: () => const LifeSpace(
-      id: LifeSpace.personalId,
-      name: 'Personal',
-      isShared: false,
-    ),
-  );
-
-  String get _title => switch (_destination) {
-    _Destination.today => 'Today',
-    _Destination.goals => 'Goals',
-    _Destination.tasks => 'Tasks',
-    _Destination.calendar => 'Calendar',
-    _Destination.ai => 'AI',
-    _Destination.more =>
-      MediaQuery.sizeOf(context).width >= 820 ? 'Settings' : 'More',
-  };
-
   Widget _page() => switch (_destination) {
     _Destination.today => TodayPage(
       goalStore: widget.goalStore,
       lifeStore: widget.lifeStore,
+      settings: widget.settings,
     ),
     _Destination.goals => LifeGoalsPage(
       store: widget.goalStore,
@@ -193,16 +123,22 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
     _Destination.tasks => TasksPage(
       goalStore: widget.goalStore,
       lifeStore: widget.lifeStore,
+      settings: widget.settings,
     ),
     _Destination.calendar => LifeCalendarPage(
       goalStore: widget.goalStore,
       lifeStore: widget.lifeStore,
+      settings: widget.settings,
     ),
-    _Destination.ai => const _AiPage(),
+    _Destination.spaces => SpacesPage(store: widget.lifeStore),
+    _Destination.ai => _AiPage(
+      onPlan: () => setState(() => _destination = _Destination.goals),
+    ),
     _Destination.more =>
       MediaQuery.sizeOf(context).width >= 820
           ? SettingsPage(
               store: widget.goalStore,
+              lifeStore: widget.lifeStore,
               settings: widget.settings,
               notificationService: widget.notificationService,
             )
@@ -219,6 +155,7 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
                     appBar: AppBar(title: const Text('Settings')),
                     body: SettingsPage(
                       store: widget.goalStore,
+                      lifeStore: widget.lifeStore,
                       settings: widget.settings,
                       notificationService: widget.notificationService,
                     ),
@@ -227,88 +164,6 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
               ),
             ),
   };
-
-  Future<void> _showSpacePicker() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Choose a space',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              for (final space in widget.lifeStore.spaces)
-                _SurfaceTile(
-                  icon: space.isShared
-                      ? Icons.group_outlined
-                      : Icons.person_outline,
-                  title: space.name,
-                  subtitle: space.isShared ? 'Shared' : 'Only you',
-                  trailing: space.id == widget.lifeStore.activeSpaceId
-                      ? const Icon(Icons.check_circle_rounded)
-                      : null,
-                  onTap: () {
-                    widget.lifeStore.selectSpace(space.id);
-                    Navigator.pop(context);
-                  },
-                ),
-              if (!widget.lifeStore.spaces.any((space) => space.isShared))
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _createSharedSpace();
-                    },
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Create your free Shared Space'),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _createSharedSpace() async {
-    final controller = TextEditingController();
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create Shared Space'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Space name',
-            hintText: 'Family, team, or group',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              widget.lifeStore.createSharedSpace(controller.text);
-              Navigator.pop(context);
-            },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-  }
 
   Future<void> _showSpaces() => Navigator.of(context).push(
     MaterialPageRoute<void>(
@@ -335,7 +190,7 @@ class _LifeBottomBar extends StatelessWidget {
   Widget build(BuildContext context) => SafeArea(
     top: false,
     child: Container(
-      height: 62,
+      height: 66,
       decoration: BoxDecoration(
         color: context.appPanel,
         border: Border(top: BorderSide(color: context.appBorder)),
@@ -353,35 +208,30 @@ class _LifeBottomBar extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      LifeGlyphIcon(
-                        _items[index].$1,
-                        size: 22,
-                        selected: selectedIndex == index,
-                        color: selectedIndex == index
-                            ? context.appText
-                            : context.appMuted,
+                      AnimatedScale(
+                        scale: selectedIndex == index ? 1.08 : 1,
+                        duration: LifeMotion.quick,
+                        curve: LifeMotion.curve,
+                        child: LifeGlyphIcon(
+                          _items[index].$1,
+                          size: 22,
+                          selected: selectedIndex == index,
+                          color: selectedIndex == index
+                              ? Theme.of(context).colorScheme.primary
+                              : context.appMuted,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         _items[index].$2,
                         style: TextStyle(
                           color: selectedIndex == index
-                              ? context.appText
+                              ? Theme.of(context).colorScheme.primary
                               : context.appMuted,
                           fontSize: 10,
                           fontWeight: selectedIndex == index
                               ? FontWeight.w600
                               : FontWeight.w400,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 160),
-                        width: selectedIndex == index ? 3 : 0,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: context.appText,
-                          shape: BoxShape.circle,
                         ),
                       ),
                     ],
@@ -395,59 +245,6 @@ class _LifeBottomBar extends StatelessWidget {
   );
 }
 
-class _DesktopTopBar extends StatelessWidget {
-  const _DesktopTopBar({
-    required this.space,
-    required this.page,
-    required this.onSpace,
-  });
-
-  final String space;
-  final String page;
-  final VoidCallback onSpace;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    height: 49,
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    decoration: BoxDecoration(
-      color: context.appPanel,
-      border: Border(bottom: BorderSide(color: context.appBorder)),
-    ),
-    child: Row(
-      children: [
-        InkWell(
-          onTap: onSpace,
-          borderRadius: BorderRadius.circular(5),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-            child: Text(
-              space,
-              style: TextStyle(color: context.appMuted, fontSize: 11),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 7),
-          child: Text(
-            '/',
-            style: TextStyle(color: context.appMuted, fontSize: 11),
-          ),
-        ),
-        Text(
-          page,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-        ),
-        const Spacer(),
-        const CircleAvatar(
-          radius: 11,
-          child: Text('YO', style: TextStyle(fontSize: 8)),
-        ),
-      ],
-    ),
-  );
-}
-
 class _DesktopNavigation extends StatelessWidget {
   const _DesktopNavigation({required this.state});
   final _LifeTrackerShellState state;
@@ -455,12 +252,12 @@ class _DesktopNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 204,
+      width: 188,
       decoration: BoxDecoration(
         color: context.appPanel,
         border: Border(right: BorderSide(color: context.appBorder)),
       ),
-      padding: const EdgeInsets.fromLTRB(10, 17, 10, 10),
+      padding: const EdgeInsets.fromLTRB(14, 20, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -470,28 +267,24 @@ class _DesktopNavigation extends StatelessWidget {
               children: [
                 const LifeMark(size: 18),
                 const SizedBox(width: 9),
-                Text(
-                  'Life Tracker',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  child: Text(
+                    'Life Tracker',
+                    style: Theme.of(context).textTheme.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                const Spacer(),
                 Icon(Icons.edit_square, size: 16, color: context.appMuted),
               ],
             ),
           ),
-          const SizedBox(height: 22),
-          _SpaceButton(
-            name: state._activeSpace.name,
-            shared: state._activeSpace.isShared,
-            onTap: state._showSpacePicker,
-          ),
-          const SizedBox(height: 14),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
-            child: Text(
-              'Workspace',
-              style: TextStyle(color: context.appMuted, fontSize: 10.5),
-            ),
+          const SizedBox(height: 28),
+          _NavItem(
+            state: state,
+            destination: _Destination.today,
+            glyph: LifeGlyph.today,
+            label: 'Today',
           ),
           _NavItem(
             state: state,
@@ -513,23 +306,15 @@ class _DesktopNavigation extends StatelessWidget {
           ),
           _NavItem(
             state: state,
-            destination: _Destination.ai,
-            glyph: LifeGlyph.sparkle,
-            label: 'AI',
-          ),
-          const SizedBox(height: 14),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
-            child: Text(
-              'Quick access',
-              style: TextStyle(color: context.appMuted, fontSize: 10.5),
-            ),
+            destination: _Destination.spaces,
+            glyph: LifeGlyph.spaces,
+            label: 'Spaces',
           ),
           _NavItem(
             state: state,
-            destination: _Destination.today,
-            glyph: LifeGlyph.today,
-            label: "Today's tasks",
+            destination: _Destination.ai,
+            glyph: LifeGlyph.sparkle,
+            label: 'AI',
           ),
           const Spacer(),
           _NavItem(
@@ -538,32 +323,27 @@ class _DesktopNavigation extends StatelessWidget {
             glyph: LifeGlyph.settings,
             label: 'Settings',
           ),
-          Divider(color: context.appBorder, height: 20),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          Divider(color: context.appBorder, height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 13,
-                  child: Text('YO', style: TextStyle(fontSize: 9)),
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: LifeMark(size: 22),
                 ),
-                SizedBox(width: 9),
+                const SizedBox(width: 9),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'You',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        'Private · On this device',
-                        style: TextStyle(fontSize: 9),
-                      ),
-                    ],
+                  child: Text(
+                    sayingForDay(state.widget.goalStore.today),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.appMuted,
+                      fontSize: 9.5,
+                      height: 1.35,
+                    ),
                   ),
                 ),
               ],
@@ -593,13 +373,28 @@ class _NavItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: selected ? context.appRaised : Colors.transparent,
+        color: selected
+            ? Color.alphaBlend(
+                Theme.of(context).colorScheme.primary.withValues(alpha: .08),
+                context.appRaised,
+              )
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(6),
         child: InkWell(
           borderRadius: BorderRadius.circular(6),
           onTap: () => state.selectDestination(destination),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+          child: Container(
+            decoration: BoxDecoration(
+              border: selected
+                  ? Border(
+                      left: BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 2,
+                      ),
+                    )
+                  : null,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
             child: Row(
               children: [
                 LifeGlyphIcon(
@@ -609,10 +404,15 @@ class _NavItem extends StatelessWidget {
                   color: selected ? context.appText : context.appMuted,
                 ),
                 const SizedBox(width: 9),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -624,125 +424,530 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _SpaceButton extends StatelessWidget {
-  const _SpaceButton({
-    required this.name,
-    required this.shared,
-    required this.onTap,
-  });
-  final String name;
-  final bool shared;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: context.appRaised,
-    borderRadius: BorderRadius.circular(7),
-    child: InkWell(
-      borderRadius: BorderRadius.circular(7),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-        child: Row(
-          children: [
-            Icon(
-              shared ? Icons.group_outlined : Icons.person_outline,
-              size: 16,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
-            const Icon(Icons.unfold_more_rounded, size: 18),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
 class TodayPage extends StatelessWidget {
   const TodayPage({
     super.key,
     required this.goalStore,
     required this.lifeStore,
+    required this.settings,
   });
   final GoalStore goalStore;
   final LifeStore lifeStore;
+  final AppSettingsController settings;
 
   @override
   Widget build(BuildContext context) {
     final today = goalStore.today;
     final goals = _goalActions(goalStore, today);
     final tasks = lifeStore.tasksFor(today);
-    final unfinishedTasks = tasks.where((task) => !task.isDoneOn(today)).length;
+    final pendingTasks = tasks.where((task) => !task.isDoneOn(today)).toList();
+    final completedTasks = tasks.where((task) => task.isDoneOn(today)).toList();
+    final completedGoals = goalStore.goals
+        .where((g) => !g.isTrashed && g.completionFor(today) != null)
+        .toList();
     final entries = lifeStore.entriesFor(today);
+    final remaining = goals.length + pendingTasks.length;
+    final completed = completedTasks.length + completedGoals.length;
+    final rows = <({int order, String time, Widget child})>[
+      for (final action in goals)
+        (
+          order: action.goal.reminder == null
+              ? -1
+              : action.goal.reminder!.hour * 60 + action.goal.reminder!.minute,
+          time: action.goal.reminder == null
+              ? 'Anytime'
+              : TimeOfDay(
+                  hour: action.goal.reminder!.hour,
+                  minute: action.goal.reminder!.minute,
+                ).format(context),
+          child: _ActionTile(
+            icon: Icons.my_location_outlined,
+            title: action.goal.name,
+            subtitle:
+                '${formatAmount(action.amount)} ${action.goal.plan!.unit}',
+            done: false,
+            onTap: () => showGoalDetailsSheet(
+              context,
+              goalStore,
+              action.goal.id,
+              showAbandoned: settings.showAbandoned,
+              progressFormat: settings.progressFormat,
+              settings: settings,
+            ),
+            onToggle: () => goalStore.completeTodayAction(action.goal.id),
+          ),
+        ),
+      for (final task in pendingTasks)
+        (
+          order: task.dueAt == null
+              ? -1
+              : task.dueAt!.hour * 60 + task.dueAt!.minute,
+          time: task.dueAt == null
+              ? 'Anytime'
+              : TimeOfDay.fromDateTime(task.dueAt!).format(context),
+          child: _TaskTile(
+            task: task,
+            store: lifeStore,
+            date: today,
+            completionCheckIns: settings.completionCheckIns,
+            onOpen: () =>
+                _showTaskEditor(context, lifeStore, goalStore, task: task),
+          ),
+        ),
+      for (final entry in entries)
+        (
+          order: entry.start.hour * 60 + entry.start.minute,
+          time: TimeOfDay.fromDateTime(entry.start).format(context),
+          child: _CalendarTile(entry: entry, store: lifeStore),
+        ),
+    ]..sort((a, b) => a.order.compareTo(b.order));
+    final wide = MediaQuery.sizeOf(context).width >= 980;
+    final nextTitle = goals.isNotEmpty
+        ? goals.first.goal.name
+        : pendingTasks.isNotEmpty
+        ? pendingTasks.first.title
+        : 'Enjoy a little breathing room.';
+    final ratio = remaining + completed == 0
+        ? 0.0
+        : completed / (remaining + completed);
+    final plan = ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Daily plan',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+            ),
+            Text(
+              '${pendingTasks.length}',
+              key: const Key('today-task-count'),
+              style: TextStyle(fontSize: 11, color: context.appMuted),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (rows.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Text(
+              'Nothing else due today',
+              style: TextStyle(color: context.appMuted),
+            ),
+          ),
+        for (final row in rows)
+          _TodayTimelineRow(time: row.time, child: row.child),
+        if (completed > 0) ...[
+          const SizedBox(height: 12),
+          _TodayCompleted(
+            count: completed,
+            children: [
+              for (final goal in completedGoals)
+                _ActionTile(
+                  icon: Icons.my_location_outlined,
+                  title: goal.name,
+                  subtitle:
+                      '${formatAmount(goal.completionFor(today)!.amount)} ${goal.plan?.unit ?? ''}',
+                  done: true,
+                  onToggle: () => goalStore.undoTodayAction(goal.id),
+                ),
+              for (final task in completedTasks)
+                _TaskTile(
+                  task: task,
+                  store: lifeStore,
+                  date: today,
+                  onOpen: () => _showTaskEditor(
+                    context,
+                    lifeStore,
+                    goalStore,
+                    task: task,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
     return _PageFrame(
       title: 'Today',
       subtitle: _friendlyDate(today),
-      child: ListView(
-        padding: EdgeInsets.zero,
+      action: wide
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.search_rounded, size: 19, color: context.appMuted),
+                const SizedBox(width: 24),
+                Text(
+                  'A more intentional day',
+                  style: TextStyle(fontSize: 11, color: context.appMuted),
+                ),
+              ],
+            )
+          : IconButton(
+              tooltip: 'Open calendar',
+              onPressed: () {},
+              icon: const Icon(Icons.calendar_today_outlined, size: 20),
+            ),
+      child: Column(
         children: [
-          _SummaryStrip(
-            first: '${goals.length + unfinishedTasks}',
-            firstLabel: 'left to do',
-            second: '${entries.length}',
-            secondLabel: 'on calendar',
+          _TodayHero(
+            progress: ratio,
+            title: nextTitle,
+            remaining: remaining,
+            scheduled: entries.length,
+            onSpeak: remaining == 0
+                ? null
+                : goals.isNotEmpty
+                ? () => _showGoalActionCheckIn(
+                    context,
+                    goalStore,
+                    goals.first.goal,
+                  )
+                : () => _showTaskCompletionCheckIn(
+                    context,
+                    lifeStore,
+                    pendingTasks.first,
+                    today,
+                  ),
           ),
-          const SizedBox(height: 22),
-          _SectionTitle(title: 'Daily actions', count: goals.length),
-          const SizedBox(height: 9),
-          if (goals.isEmpty)
-            const _EmptyCard(
-              icon: Icons.wb_sunny_outlined,
-              title: 'Your day is clear',
-              body: 'Active goals with a plan will appear here automatically.',
-            )
-          else
-            for (final action in goals)
-              _ActionTile(
-                icon: Icons.flag_outlined,
-                title: action.goal.name,
-                subtitle:
-                    '${formatAmount(action.amount)} ${action.goal.plan!.unit}',
-                done: action.goal.completionFor(today) != null,
-                onToggle: () => action.goal.completionFor(today) == null
-                    ? goalStore.completeTodayAction(action.goal.id)
-                    : goalStore.undoTodayAction(action.goal.id),
-              ),
-          const SizedBox(height: 22),
-          _SectionTitle(
-            title: 'Tasks',
-            count: unfinishedTasks,
-            countKey: const Key('today-task-count'),
+          const SizedBox(height: 20),
+          Expanded(
+            child: wide
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(flex: 5, child: plan),
+                      const SizedBox(width: 20),
+                      SizedBox(
+                        width: 310,
+                        child: _TodayFocusPanel(
+                          progress: ratio,
+                          remaining: remaining,
+                          scheduled: entries.length,
+                          labels: [
+                            for (final action in goals) action.goal.name,
+                            for (final task in pendingTasks) task.title,
+                          ],
+                          completed: completed,
+                        ),
+                      ),
+                    ],
+                  )
+                : plan,
           ),
-          const SizedBox(height: 9),
-          if (tasks.isEmpty)
-            const _EmptyCard(
-              icon: Icons.check_circle_outline_rounded,
-              title: 'No tasks due today',
-              body: 'Add a task from the Tasks page when you need one.',
-            )
-          else
-            for (final task in tasks)
-              _TaskTile(
-                task: task,
-                store: lifeStore,
-                date: today,
-                onOpen: () =>
-                    _showTaskEditor(context, lifeStore, goalStore, task: task),
-              ),
-          if (entries.isNotEmpty) ...[
-            const SizedBox(height: 22),
-            _SectionTitle(title: 'Schedule', count: entries.length),
-            const SizedBox(height: 9),
-            for (final entry in entries)
-              _CalendarTile(entry: entry, store: lifeStore),
-          ],
         ],
       ),
     );
   }
+}
+
+class _TodayHero extends StatelessWidget {
+  const _TodayHero({
+    required this.progress,
+    required this.title,
+    required this.remaining,
+    required this.scheduled,
+    required this.onSpeak,
+  });
+  final double progress;
+  final String title;
+  final int remaining;
+  final int scheduled;
+  final VoidCallback? onSpeak;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minHeight: 108),
+    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [context.appRaised, context.appPanel],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: context.appBorder),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: context.isDarkMode ? .18 : .06),
+          blurRadius: 24,
+          offset: const Offset(0, 10),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        _LifeProgressRing(value: progress, size: 62, stroke: 6),
+        const SizedBox(width: 22),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                remaining == 0 ? 'All clear' : 'Next',
+                style: TextStyle(fontSize: 12, color: context.appMuted),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -.2,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                '$remaining left · $scheduled scheduled',
+                style: TextStyle(fontSize: 11, color: context.appMuted),
+              ),
+            ],
+          ),
+        ),
+        if (onSpeak != null) ...[
+          const SizedBox(width: 14),
+          Material(
+            color: Theme.of(context).colorScheme.primary,
+            shape: const CircleBorder(),
+            child: IconButton(
+              tooltip: 'Speak about what you completed',
+              onPressed: onSpeak,
+              color: Theme.of(context).colorScheme.onPrimary,
+              icon: const Icon(Icons.mic_none_rounded),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _LifeProgressRing extends StatelessWidget {
+  const _LifeProgressRing({
+    required this.value,
+    required this.size,
+    required this.stroke,
+  });
+  final double value;
+  final double size;
+  final double stroke;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: size,
+    height: size,
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox.expand(
+          child: CircularProgressIndicator(
+            value: value.clamp(0, 1),
+            strokeWidth: stroke,
+            strokeCap: StrokeCap.round,
+            backgroundColor: context.appBorder,
+          ),
+        ),
+        Align(
+          alignment: Alignment.topCenter,
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _TodayTimelineRow extends StatelessWidget {
+  const _TodayTimelineRow({required this.time, required this.child});
+  final String time;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: 58,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 15),
+            child: Text(
+              time,
+              style: TextStyle(fontSize: 10, color: context.appMuted),
+            ),
+          ),
+        ),
+        Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            Container(width: 1, color: context.appBorder),
+            Container(
+              width: 7,
+              height: 7,
+              margin: const EdgeInsets.only(top: 17),
+              decoration: BoxDecoration(
+                color: context.appMuted,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: child),
+      ],
+    ),
+  );
+}
+
+class _TodayCompleted extends StatelessWidget {
+  const _TodayCompleted({required this.count, required this.children});
+  final int count;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => ExpansionTile(
+    tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+    childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+    collapsedBackgroundColor: context.appRaised,
+    backgroundColor: context.appPanel,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    collapsedShape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: BorderSide(color: context.appBorder),
+    ),
+    leading: const Icon(Icons.check_circle, color: Color(0xFF79CB8B), size: 20),
+    title: const Text('Completed', style: TextStyle(fontSize: 13)),
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('$count', style: TextStyle(fontSize: 11, color: context.appMuted)),
+        const SizedBox(width: 8),
+        const Icon(Icons.expand_more_rounded, size: 18),
+      ],
+    ),
+    children: children,
+  );
+}
+
+class _TodayFocusPanel extends StatelessWidget {
+  const _TodayFocusPanel({
+    required this.progress,
+    required this.remaining,
+    required this.scheduled,
+    required this.labels,
+    required this.completed,
+  });
+  final double progress;
+  final int remaining;
+  final int scheduled;
+  final List<String> labels;
+  final int completed;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    children: [
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: context.appRaised.withValues(alpha: .78),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.appBorder),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                _LifeProgressRing(value: progress, size: 54, stroke: 5),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Today's focus",
+                        style: TextStyle(fontSize: 11, color: context.appMuted),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        '$remaining left · $scheduled scheduled',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Divider(color: context.appBorder),
+            for (final label in labels.take(4))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.square_outlined,
+                      size: 17,
+                      color: context.appMuted,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+      if (completed > 0) ...[
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          decoration: BoxDecoration(
+            color: context.appRaised,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: context.appBorder),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.check_circle,
+                color: Color(0xFF79CB8B),
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Completed',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                '$completed',
+                style: TextStyle(fontSize: 11, color: context.appMuted),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ],
+  );
 }
 
 class TasksPage extends StatefulWidget {
@@ -750,9 +955,11 @@ class TasksPage extends StatefulWidget {
     super.key,
     required this.goalStore,
     required this.lifeStore,
+    required this.settings,
   });
   final GoalStore goalStore;
   final LifeStore lifeStore;
+  final AppSettingsController settings;
 
   @override
   State<TasksPage> createState() => _TasksPageState();
@@ -760,6 +967,7 @@ class TasksPage extends StatefulWidget {
 
 class _TasksPageState extends State<TasksPage> {
   int _filter = 0;
+  bool _showCompleted = true;
 
   @override
   Widget build(BuildContext context) {
@@ -772,12 +980,12 @@ class _TasksPageState extends State<TasksPage> {
     }).toList();
     return _PageFrame(
       title: 'Tasks',
-      subtitle: 'Clear actions, with only the detail you need.',
+      subtitle: '',
       action: FilledButton.icon(
         onPressed: () =>
             _showTaskEditor(context, widget.lifeStore, widget.goalStore),
         icon: const Icon(Icons.add_rounded),
-        label: const Text('New task'),
+        label: const Text('Add task'),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -798,10 +1006,15 @@ class _TasksPageState extends State<TasksPage> {
                   )
                 : ListView(
                     children: [
-                      for (final task in tasks)
+                      for (final task in tasks.where(
+                        (t) => _filter == 0 ? !t.isDoneOn(now) : !t.isCompleted,
+                      ))
                         _TaskTile(
                           task: task,
+                          date: _filter == 0 ? now : null,
                           store: widget.lifeStore,
+                          completionCheckIns:
+                              widget.settings.completionCheckIns,
                           onOpen: () => _showTaskEditor(
                             context,
                             widget.lifeStore,
@@ -809,6 +1022,54 @@ class _TasksPageState extends State<TasksPage> {
                             task: task,
                           ),
                         ),
+                      if (tasks.any(
+                        (t) => _filter == 0 ? t.isDoneOn(now) : t.isCompleted,
+                      )) ...[
+                        const SizedBox(height: 12),
+                        InkWell(
+                          onTap: () =>
+                              setState(() => _showCompleted = !_showCompleted),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _showCompleted
+                                      ? Icons.keyboard_arrow_down
+                                      : Icons.chevron_right,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('Completed'),
+                                const Spacer(),
+                                Text(
+                                  '${tasks.where((t) => _filter == 0 ? t.isDoneOn(now) : t.isCompleted).length}',
+                                  style: TextStyle(color: context.appMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_showCompleted)
+                          for (final task in tasks.where(
+                            (t) =>
+                                _filter == 0 ? t.isDoneOn(now) : t.isCompleted,
+                          ))
+                            _TaskTile(
+                              task: task,
+                              store: widget.lifeStore,
+                              date: _filter == 0 ? now : null,
+                              completionCheckIns:
+                                  widget.settings.completionCheckIns,
+                              onOpen: () => _showTaskEditor(
+                                context,
+                                widget.lifeStore,
+                                widget.goalStore,
+                                task: task,
+                              ),
+                            ),
+                      ],
                     ],
                   ),
           ),
@@ -1162,79 +1423,237 @@ class SpacesPage extends StatelessWidget {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: store,
     builder: (context, _) {
+      final mobile = MediaQuery.sizeOf(context).width < 820;
       final active = store.spaces.firstWhere(
         (space) => space.id == store.activeSpaceId,
       );
       final hasShared = store.spaces.any((space) => space.isShared);
-      return Scaffold(
-        appBar: AppBar(title: const Text('Spaces')),
-        body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(18),
+      final assigned = store.tasks
+          .where(
+            (task) =>
+                task.spaceId == active.id &&
+                task.assignee.toLowerCase() == 'you' &&
+                !task.isCompleted,
+          )
+          .toList();
+      final body = ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          Row(
             children: [
-              const _EmptyCard(
-                icon: Icons.lock_outline_rounded,
-                title: 'Your Personal Space stays private',
-                body:
-                    'It works completely offline. Only things you deliberately place in a Shared Space are meant to leave this device.',
-              ),
-              const SizedBox(height: 14),
-              for (final space in store.spaces)
-                _SurfaceTile(
-                  icon: space.isShared
-                      ? Icons.group_outlined
-                      : Icons.person_outline,
-                  title: space.name,
-                  subtitle: space.isShared
-                      ? '${space.members.length} member${space.members.length == 1 ? '' : 's'}'
-                      : 'Only you',
-                  onTap: () => store.selectSpace(space.id),
+              Expanded(
+                child: _TextTabs(
+                  labels: const ['Personal Space', 'Shared Spaces'],
+                  selected: active.isShared ? 1 : 0,
+                  onSelected: (index) {
+                    final matches = store.spaces.where(
+                      (s) => s.isShared == (index == 1),
+                    );
+                    if (matches.isEmpty) {
+                      _createSharedSpace(context);
+                    } else {
+                      store.selectSpace(matches.first.id);
+                    }
+                  },
                 ),
-              if (!hasShared) ...[
-                const SizedBox(height: 8),
+              ),
+              if (!mobile) ...[
+                const SizedBox(width: 12),
                 FilledButton.icon(
                   onPressed: () => _createSharedSpace(context),
-                  icon: const Icon(Icons.group_add_outlined),
-                  label: const Text('Create your free Shared Space'),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'One online Shared Space will be free. More online spaces will be part of the paid version.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: context.appMuted),
-                ),
-              ],
-              if (active.isShared) ...[
-                const SizedBox(height: 22),
-                Text('Members', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 10),
-                for (final member in active.members)
-                  _SurfaceTile(
-                    icon: member.role == SpaceRole.owner
-                        ? Icons.workspace_premium_outlined
-                        : member.role == SpaceRole.manager
-                        ? Icons.admin_panel_settings_outlined
-                        : Icons.person_outline,
-                    title: member.name,
-                    subtitle: member.role.label,
-                  ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _addMember(context),
-                  icon: const Icon(Icons.person_add_alt_1_rounded),
-                  label: const Text('Add a person'),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Online invitations and syncing will be added with the paid online service. Local roles and assignments are ready now.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: context.appMuted),
+                  icon: const Icon(Icons.add_rounded, size: 17),
+                  label: const Text('Create space'),
                 ),
               ],
             ],
+          ),
+          const SizedBox(height: 14),
+          for (final space in store.spaces.where(
+            (s) => s.isShared == active.isShared,
+          ))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Material(
+                color: context.appRaised.withValues(alpha: .9),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
+                  side: BorderSide(color: context.appBorder),
+                ),
+                borderRadius: BorderRadius.circular(10),
+                child: ListTile(
+                  leading: Icon(
+                    space.isShared ? Icons.group_outlined : Icons.lock_outline,
+                    size: 23,
+                  ),
+                  title: Text(space.name, style: const TextStyle(fontSize: 14)),
+                  subtitle: const Text(
+                    'Private · On this device',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  trailing: Icon(
+                    space.id == active.id ? Icons.check : Icons.chevron_right,
+                    size: 17,
+                  ),
+                  onTap: () => store.selectSpace(space.id),
+                ),
+              ),
+            ),
+          if (!hasShared) ...[
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: () => _createSharedSpace(context),
+              icon: const Icon(Icons.group_add_outlined),
+              label: const Text('Create your free Shared Space'),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'One online Shared Space will be free. More online spaces will be part of the paid version.',
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: context.appMuted),
+            ),
+          ],
+          if (active.isShared) ...[
+            const SizedBox(height: 22),
+            const Text(
+              'Members',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 14),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final member in active.members)
+                    SizedBox(
+                      width: 76,
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 23,
+                            backgroundColor: context.appRaised,
+                            foregroundColor: context.appText,
+                            child: Text(
+                              member.name.isEmpty
+                                  ? '?'
+                                  : member.name[0].toUpperCase(),
+                              style: TextStyle(color: context.appText),
+                            ),
+                          ),
+                          const SizedBox(height: 7),
+                          Text(
+                            member.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            member.role.label,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: context.appMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  SizedBox(
+                    width: 76,
+                    child: Column(
+                      children: [
+                        IconButton.outlined(
+                          onPressed: () => _addMember(context),
+                          icon: const Icon(Icons.add, size: 21),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Add member',
+                          style: TextStyle(fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (assigned.isNotEmpty) ...[
+              const SizedBox(height: 22),
+              Text(
+                'Assigned to you',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 10),
+              for (final task in assigned)
+                _SurfaceTile(
+                  icon: Icons.check_circle_outline_rounded,
+                  title: task.title,
+                  subtitle: task.dueAt == null
+                      ? 'No date'
+                      : _shortDate(task.dueAt!),
+                ),
+            ],
+          ],
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: context.appRaised.withValues(alpha: .66),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: context.appBorder),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.lock_outline_rounded,
+                  size: 18,
+                  color: context.appMuted,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Spaces are private and stored on this device. Online invitations and syncing are not available yet.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: context.appMuted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+      if (mobile) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Spaces'),
+            centerTitle: false,
+            actions: [
+              IconButton(
+                tooltip: 'Create space',
+                onPressed: () => _createSharedSpace(context),
+                icon: const Icon(Icons.add_rounded),
+              ),
+            ],
+          ),
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: body,
+            ),
+          ),
+        );
+      }
+      return _PageFrame(
+        title: 'Spaces',
+        subtitle: 'Keep life organized. Share what matters.',
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: body,
           ),
         ),
       );
@@ -1388,17 +1807,74 @@ class _MorePage extends StatelessWidget {
 }
 
 class _AiPage extends StatelessWidget {
-  const _AiPage();
-
+  const _AiPage({required this.onPlan});
+  final VoidCallback onPlan;
   @override
-  Widget build(BuildContext context) => const _PageFrame(
+  Widget build(BuildContext context) => _PageFrame(
     title: 'AI',
-    subtitle: 'Optional help will live here without replacing the manual app.',
+    subtitle: '',
     child: Center(
-      child: _EmptyCard(
-        icon: Icons.auto_awesome_outlined,
-        title: 'Work in progress',
-        body: 'The rest of Life Tracker works without AI.',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 330),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 98,
+              height: 92,
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: 8,
+                    top: 10,
+                    child: Icon(
+                      Icons.subject_outlined,
+                      size: 70,
+                      color: context.appMuted,
+                    ),
+                  ),
+                  const Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: LifeMark(size: 40),
+                  ),
+                  Positioned(
+                    right: 0,
+                    top: 4,
+                    child: LifeGlyphIcon(
+                      LifeGlyph.sparkle,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Work in progress',
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'In the future, AI can suggest a goal plan, tasks and a calendar schedule.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.65,
+                color: context.appMuted,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You can still plan manually anytime.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: context.appMuted),
+            ),
+            const SizedBox(height: 28),
+            FilledButton(onPressed: onPlan, child: const Text('Plan manually')),
+          ],
+        ),
       ),
     ),
   );
@@ -1429,133 +1905,37 @@ class _PageFrame extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (mobile)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.displaySmall),
-                const SizedBox(height: 5),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: context.appMuted),
-                ),
-                if (action != null) ...[
-                  const SizedBox(height: 12),
-                  Align(alignment: Alignment.centerRight, child: action),
-                ],
-              ],
-            )
-          else
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.displaySmall,
-                      ),
-                      const SizedBox(height: 5),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.displaySmall,
+                    ),
+                    if (subtitle.isNotEmpty) const SizedBox(height: 5),
+                    if (subtitle.isNotEmpty)
                       Text(
                         subtitle,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: context.appMuted,
                         ),
                       ),
-                    ],
-                  ),
+                  ],
                 ),
-                if (action != null) ...[const SizedBox(width: 12), action!],
-              ],
-            ),
+              ),
+              if (action != null) ...[const SizedBox(width: 12), action!],
+            ],
+          ),
           const SizedBox(height: 20),
           Expanded(child: child),
         ],
       ),
     );
   }
-}
-
-class _SummaryStrip extends StatelessWidget {
-  const _SummaryStrip({
-    required this.first,
-    required this.firstLabel,
-    required this.second,
-    required this.secondLabel,
-  });
-  final String first;
-  final String firstLabel;
-  final String second;
-  final String secondLabel;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 3),
-    child: Row(
-      children: [
-        _metric(context, first, firstLabel),
-        Container(width: 1, height: 26, color: context.appBorder),
-        _metric(context, second, secondLabel),
-      ],
-    ),
-  );
-
-  Widget _metric(BuildContext context, String value, String label) => Expanded(
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          value,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: context.appMuted),
-        ),
-      ],
-    ),
-  );
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({
-    required this.title,
-    required this.count,
-    this.countKey,
-  });
-  final String title;
-  final int count;
-  final Key? countKey;
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Expanded(
-        child: Text(
-          title,
-          style: TextStyle(
-            color: context.appMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: .8,
-          ),
-        ),
-      ),
-      Text(
-        '$count',
-        key: countKey,
-        style: TextStyle(color: context.appMuted, fontSize: 11),
-      ),
-    ],
-  );
 }
 
 class _EmptyCard extends StatelessWidget {
@@ -1629,37 +2009,40 @@ class _TextTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      border: Border(bottom: BorderSide(color: context.appBorder)),
-    ),
-    child: Row(
+    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
+    child: Wrap(
+      runSpacing: 6,
       children: [
         for (var index = 0; index < labels.length; index++)
           InkWell(
+            borderRadius: BorderRadius.circular(10),
             onTap: () => onSelected(index),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(2, 8, 24, 10),
-              child: Column(
-                children: [
-                  Text(
-                    labels[index],
-                    style: TextStyle(
-                      color: selected == index
-                          ? context.appText
-                          : context.appMuted,
-                      fontWeight: selected == index
-                          ? FontWeight.w600
-                          : FontWeight.w400,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    height: 1.5,
-                    width: selected == index ? 26 : 0,
-                    color: context.appText,
-                  ),
-                ],
+            child: AnimatedContainer(
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 160),
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+              decoration: BoxDecoration(
+                color: selected == index
+                    ? context.appRaised
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: selected == index
+                      ? context.appBorder
+                      : context.appBorder.withValues(alpha: .45),
+                ),
+              ),
+              child: Text(
+                labels[index],
+                style: TextStyle(
+                  fontSize: 12,
+                  color: selected == index ? context.appText : context.appMuted,
+                  fontWeight: selected == index
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                ),
               ),
             ),
           ),
@@ -1673,13 +2056,11 @@ class _SurfaceTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    this.trailing,
     this.onTap,
   });
   final IconData icon;
   final String title;
   final String subtitle;
-  final Widget? trailing;
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => Padding(
@@ -1717,10 +2098,7 @@ class _SurfaceTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (trailing != null)
-                trailing!
-              else if (onTap != null)
-                const Icon(Icons.chevron_right_rounded),
+              if (onTap != null) const Icon(Icons.chevron_right_rounded),
             ],
           ),
         ),
@@ -1745,18 +2123,83 @@ class _ActionTile extends StatelessWidget {
   final VoidCallback? onToggle;
   final VoidCallback? onTap;
   @override
-  Widget build(BuildContext context) => _SurfaceTile(
-    icon: icon,
-    title: title,
-    subtitle: subtitle,
-    onTap: onTap,
-    trailing: IconButton(
-      onPressed: onToggle,
-      icon: Icon(
-        done
-            ? Icons.check_circle_rounded
-            : Icons.radio_button_unchecked_rounded,
-        color: done ? const Color(0xFF55C891) : context.appMuted,
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Material(
+      color: context.appRaised.withValues(alpha: .86),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(9),
+        side: BorderSide(color: context.appBorder.withValues(alpha: .82)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(2, 5, 10, 5),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              IconButton(
+                tooltip: done ? 'Mark incomplete' : 'Complete',
+                onPressed: onToggle,
+                icon: Icon(
+                  done ? Icons.check_circle : Icons.circle_outlined,
+                  size: 22,
+                  color: done ? const Color(0xFF74D786) : context.appText,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.25,
+                          fontWeight: FontWeight.w500,
+                          color: done ? context.appMuted : context.appText,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(icon, size: 13, color: context.appMuted),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                subtitle,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  height: 1.25,
+                                  color: context.appMuted,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              if (onTap != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(
+                    Icons.chevron_right,
+                    size: 17,
+                    color: context.appMuted,
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     ),
   );
@@ -1768,15 +2211,18 @@ class _TaskTile extends StatelessWidget {
     required this.store,
     this.date,
     this.onOpen,
+    this.completionCheckIns = false,
   });
   final LifeTask task;
   final LifeStore store;
   final DateTime? date;
   final VoidCallback? onOpen;
+  final bool completionCheckIns;
   @override
   Widget build(BuildContext context) {
     final details = <String>[
-      if (task.dueAt != null) _shortDate(task.dueAt!),
+      if (task.dueAt != null)
+        '${_shortDate(task.dueAt!)} · ${TimeOfDay.fromDateTime(task.dueAt!).format(context)}',
       if (task.repeat != TaskRepeat.none) task.repeat.label,
       if (task.location.isNotEmpty) task.location,
       if (task.assignee.isNotEmpty) 'Assigned to ${task.assignee}',
@@ -1803,12 +2249,213 @@ class _TaskTile extends StatelessWidget {
         subtitle: details.isEmpty ? 'No date' : details.join('  ·  '),
         onTap: onOpen,
         done: date == null ? task.isCompleted : task.isDoneOn(date!),
-        onToggle: () => date == null
-            ? store.toggleTask(task)
-            : store.toggleTaskForDate(task, date!),
+        onToggle: () {
+          final taskDate = date ?? task.dueAt ?? DateTime.now();
+          final done = date == null ? task.isCompleted : task.isDoneOn(date!);
+          if (done) {
+            if (date == null) {
+              store.toggleTask(task);
+            } else {
+              store.toggleTaskForDate(task, date!);
+            }
+            return;
+          }
+          if (completionCheckIns) {
+            store.completeTaskForDate(task, taskDate);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Task finished'),
+                action: SnackBarAction(
+                  label: 'Add progress note',
+                  onPressed: () => _showTaskCompletionCheckIn(
+                    context,
+                    store,
+                    task,
+                    taskDate,
+                  ),
+                ),
+              ),
+            );
+            return;
+          }
+          store.completeTaskForDate(task, taskDate);
+        },
       ),
     );
   }
+}
+
+Future<void> _showTaskCompletionCheckIn(
+  BuildContext context,
+  LifeStore store,
+  LifeTask task,
+  DateTime day,
+) async {
+  final note = TextEditingController(
+    text: task.completionNoteFor(day)?.text ?? '',
+  );
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (context) => Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        2,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 22,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: context.appSoftGreen,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.check_rounded, color: context.appSuccess),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Task finished',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    Text(
+                      task.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'How did you do it?',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Optional. Keep a useful record of what worked.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            key: const Key('task-completion-note'),
+            controller: note,
+            autofocus: true,
+            minLines: 3,
+            maxLines: 6,
+            decoration: InputDecoration(
+              hintText: 'Add a progress note…',
+              suffixIcon: SpeechInputButton(controller: note),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    store.completeTaskForDate(task, day);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Done without note'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () {
+                    store.completeTaskForDate(task, day, note: note.text);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Save note'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+  await Future<void>.delayed(const Duration(milliseconds: 300));
+  note.dispose();
+}
+
+Future<void> _showGoalActionCheckIn(
+  BuildContext context,
+  GoalStore store,
+  Goal goal,
+) async {
+  final note = TextEditingController();
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (context) => Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        2,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 22,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Finish today\'s action',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            goal.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: context.appMuted),
+          ),
+          const SizedBox(height: 18),
+          TextField(
+            key: const Key('goal-completion-note'),
+            controller: note,
+            autofocus: true,
+            minLines: 3,
+            maxLines: 6,
+            decoration: InputDecoration(
+              labelText: 'How did you do it? (optional)',
+              hintText: 'Speak or type a useful progress note…',
+              suffixIcon: SpeechInputButton(controller: note),
+            ),
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: () {
+              store.completeTodayAction(goal.id, note: note.text);
+              Navigator.pop(context);
+            },
+            icon: const Icon(Icons.check_rounded),
+            label: const Text('Complete and save'),
+          ),
+        ],
+      ),
+    ),
+  );
+  await Future<void>.delayed(const Duration(milliseconds: 300));
+  note.dispose();
 }
 
 class _CalendarTile extends StatelessWidget {
@@ -1841,185 +2488,293 @@ Future<void> _showTaskEditor(
   LifeStore store,
   GoalStore goals, {
   LifeTask? task,
-}) async {
-  final editing = task != null;
-  final title = TextEditingController(text: task?.title ?? '');
-  final notes = TextEditingController(text: task?.notes ?? '');
-  final location = TextEditingController(text: task?.location ?? '');
-  var due = task?.dueAt ?? goals.today;
-  var repeat = task?.repeat ?? TaskRepeat.none;
-  String? goalId = task?.goalId;
-  var assignee = task?.assignee ?? '';
-  final activeSpace = store.spaces.firstWhere(
-    (space) => space.id == store.activeSpaceId,
+}) {
+  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) => _TaskEditor(store: store, goals: goals, task: task),
+    ),
   );
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          4,
-          20,
-          MediaQuery.viewInsetsOf(context).bottom + 22,
+}
+
+class _TaskEditor extends StatefulWidget {
+  const _TaskEditor({required this.store, required this.goals, this.task});
+  final LifeStore store;
+  final GoalStore goals;
+  final LifeTask? task;
+  @override
+  State<_TaskEditor> createState() => _TaskEditorState();
+}
+
+class _TaskEditorState extends State<_TaskEditor> {
+  late final _title = TextEditingController(text: widget.task?.title ?? '');
+  late final _notes = TextEditingController(text: widget.task?.notes ?? '');
+  late final _location = TextEditingController(
+    text: widget.task?.location ?? '',
+  );
+  late DateTime _due = widget.task?.dueAt ?? widget.goals.today;
+  late bool _hasDate = widget.task == null || widget.task!.dueAt != null;
+  late TaskRepeat _repeat = widget.task?.repeat ?? TaskRepeat.none;
+  late String? _goalId = widget.task?.goalId;
+  late String _assignee = widget.task?.assignee ?? '';
+  bool _saving = false;
+  String? _error;
+  @override
+  void dispose() {
+    _title.dispose();
+    _notes.dispose();
+    _location.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    if (_title.text.trim().isEmpty) {
+      setState(() => _error = 'Give the task a title.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      if (widget.task == null) {
+        await widget.store.addTask(
+          title: _title.text,
+          notes: _notes.text,
+          dueAt: _hasDate ? _due : null,
+          repeat: _repeat,
+          goalId: _goalId,
+          location: _location.text,
+          assignee: _assignee,
+        );
+      } else {
+        await widget.store.updateTask(
+          widget.task!.copyWith(
+            title: _title.text.trim(),
+            notes: _notes.text.trim(),
+            dueAt: _hasDate ? _due : null,
+            clearDue: !_hasDate,
+            repeat: _repeat,
+            goalId: _goalId,
+            clearGoal: _goalId == null,
+            location: _location.text.trim(),
+            assignee: _assignee,
+          ),
+        );
+      }
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error = 'Could not save. Please try again.';
+        });
+      }
+    }
+  }
+
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.only(top: 20, bottom: 8),
+    child: Text(text, style: TextStyle(fontSize: 12, color: context.appMuted)),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final space = widget.store.spaces.firstWhere(
+      (s) => s.id == (widget.task?.spaceId ?? widget.store.activeSpaceId),
+    );
+    final availableGoals = widget.goals.goals
+        .where((g) => !g.isTrashed || g.id == _goalId)
+        .toList();
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          widget.task == null ? 'Add task' : 'Edit task',
+          style: const TextStyle(fontSize: 16),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                editing ? 'Edit task' : 'New task',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                key: const Key('task-title-field'),
-                controller: title,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'What needs to be done?',
+      ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+              children: [
+                _label('Title'),
+                TextField(
+                  key: const Key('task-title-field'),
+                  controller: _title,
+                  decoration: const InputDecoration(
+                    hintText: 'What needs to be done?',
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: notes,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
+                _label('Date and time'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                            initialDate: _due,
+                          );
+                          if (date != null && mounted) {
+                            _hasDate = true;
+                            setState(
+                              () => _due = DateTime(
+                                date.year,
+                                date.month,
+                                date.day,
+                                _due.hour,
+                                _due.minute,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 17,
+                        ),
+                        label: Text(_hasDate ? _shortDate(_due) : 'No date'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const Key('task-time-button'),
+                        onPressed: () async {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.fromDateTime(_due),
+                          );
+                          if (time != null && mounted) {
+                            _hasDate = true;
+                            setState(
+                              () => _due = DateTime(
+                                _due.year,
+                                _due.month,
+                                _due.day,
+                                time.hour,
+                                time.minute,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.schedule, size: 17),
+                        label: Text(
+                          TimeOfDay.fromDateTime(_due).format(context),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final chosen = await showDatePicker(
-                          context: context,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2100),
-                          initialDate: due,
-                        );
-                        if (chosen != null) setState(() => due = chosen);
-                      },
-                      icon: const Icon(Icons.calendar_today_outlined),
-                      label: Text(_shortDate(due)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: DropdownButtonFormField<TaskRepeat>(
-                      isExpanded: true,
-                      initialValue: repeat,
-                      items: [
-                        for (final item in TaskRepeat.values)
-                          DropdownMenuItem(
-                            value: item,
-                            child: Text(item.label),
-                          ),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => repeat = value ?? TaskRepeat.none),
-                      decoration: const InputDecoration(labelText: 'Repeat'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String?>(
-                isExpanded: true,
-                initialValue: goalId,
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('No connected goal'),
-                  ),
-                  for (final goal in goals.goals.where(
-                    (goal) => !goal.isTrashed,
-                  ))
-                    DropdownMenuItem<String?>(
-                      value: goal.id,
-                      child: Text(goal.name, overflow: TextOverflow.ellipsis),
-                    ),
-                ],
-                onChanged: (value) => setState(() => goalId = value),
-                decoration: const InputDecoration(labelText: 'Goal (optional)'),
-              ),
-              const SizedBox(height: 10),
-              if (activeSpace.isShared) ...[
-                DropdownButtonFormField<String>(
+                _label('Repeat'),
+                DropdownButtonFormField<TaskRepeat>(
+                  initialValue: _repeat,
                   isExpanded: true,
-                  initialValue: assignee,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.repeat, size: 18),
+                  ),
                   items: [
-                    const DropdownMenuItem(
-                      value: '',
-                      child: Text('Unassigned'),
+                    for (final r in TaskRepeat.values)
+                      DropdownMenuItem(value: r, child: Text(r.label)),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _repeat = v ?? TaskRepeat.none),
+                ),
+                _label('Linked goal'),
+                DropdownButtonFormField<String?>(
+                  initialValue: availableGoals.any((g) => g.id == _goalId)
+                      ? _goalId
+                      : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.my_location_outlined, size: 18),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('No connected goal'),
                     ),
-                    for (final member in activeSpace.members)
+                    for (final g in availableGoals)
                       DropdownMenuItem(
-                        value: member.name,
-                        child: Text(member.name),
+                        value: g.id,
+                        child: Text(g.name, overflow: TextOverflow.ellipsis),
                       ),
                   ],
-                  onChanged: (value) => setState(() => assignee = value ?? ''),
+                  onChanged: (v) => setState(() => _goalId = v),
+                ),
+                _label('Location'),
+                TextField(
+                  controller: _location,
                   decoration: const InputDecoration(
-                    labelText: 'Assign to (optional)',
+                    hintText: 'Add location',
+                    prefixIcon: Icon(Icons.location_on_outlined, size: 18),
                   ),
                 ),
-                const SizedBox(height: 10),
-              ],
-              TextField(
-                controller: location,
-                decoration: const InputDecoration(
-                  labelText: 'Location (optional)',
-                  prefixIcon: Icon(Icons.location_on_outlined),
-                ),
-              ),
-              const SizedBox(height: 18),
-              FilledButton(
-                key: const Key('task-save-button'),
-                onPressed: () {
-                  if (title.text.trim().isEmpty) return;
-                  if (task == null) {
-                    store.addTask(
-                      title: title.text,
-                      notes: notes.text,
-                      dueAt: due,
-                      repeat: repeat,
-                      goalId: goalId,
-                      location: location.text,
-                      assignee: assignee,
-                    );
-                  } else {
-                    store.updateTask(
-                      task.copyWith(
-                        title: title.text.trim(),
-                        notes: notes.text.trim(),
-                        dueAt: due,
-                        repeat: repeat,
-                        goalId: goalId,
-                        clearGoal: goalId == null,
-                        location: location.text.trim(),
-                        assignee: assignee.trim(),
+                if (space.isShared) ...[
+                  _label('Assigned to'),
+                  DropdownButtonFormField<String>(
+                    initialValue: _assignee,
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('Unassigned'),
                       ),
-                    );
-                  }
-                  Navigator.pop(context);
-                },
-                child: Text(editing ? 'Save changes' : 'Add task'),
-              ),
-            ],
+                      for (final name in {
+                        ...space.members.map((m) => m.name),
+                        if (_assignee.isNotEmpty) _assignee,
+                      })
+                        DropdownMenuItem(value: name, child: Text(name)),
+                    ],
+                    onChanged: (v) => setState(() => _assignee = v ?? ''),
+                  ),
+                ],
+                _label('Notes'),
+                TextField(
+                  controller: _notes,
+                  minLines: 3,
+                  maxLines: 6,
+                  decoration: InputDecoration(
+                    hintText: 'Add a note…',
+                    suffixIcon: SpeechInputButton(controller: _notes),
+                  ),
+                ),
+                if (widget.task != null &&
+                    widget.task!.completionNotes.isNotEmpty) ...[
+                  _label('Progress notes'),
+                  for (final note in widget.task!.completionNotes)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(note.text),
+                    ),
+                ],
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Text(
+                      _error!,
+                      style: TextStyle(color: context.appDangerText),
+                    ),
+                  ),
+                const SizedBox(height: 24),
+                FilledButton(
+                  key: const Key('task-save-button'),
+                  onPressed: _saving ? null : _save,
+                  child: Text(_saving ? 'Saving…' : 'Save'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-  await Future<void>.delayed(const Duration(milliseconds: 350));
-  title.dispose();
-  notes.dispose();
-  location.dispose();
+    );
+  }
 }
 
 Future<void> _showCalendarEditor(

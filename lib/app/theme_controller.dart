@@ -17,7 +17,7 @@ enum AppAppearance {
   };
   static AppAppearance parse(String? value) => AppAppearance.values.firstWhere(
     (item) => item.name == value,
-    orElse: () => AppAppearance.system,
+    orElse: () => AppAppearance.dark,
   );
 }
 
@@ -38,7 +38,7 @@ enum AppAccentColor {
   slate('Slate', AppAccentGroup.cool, Color(0xFF56677A)),
   rose('Rose', AppAccentGroup.warm, Color(0xFFB94369)),
   berry('Berry', AppAccentGroup.warm, Color(0xFF8F3E72)),
-  coral('Coral', AppAccentGroup.warm, Color(0xFFC25547)),
+  coral('Coral', AppAccentGroup.warm, Color(0xFFFF7968)),
   plum('Plum', AppAccentGroup.warm, Color(0xFF754787)),
   lavender('Lavender', AppAccentGroup.warm, Color(0xFF6F5AA8)),
   amber('Amber', AppAccentGroup.balanced, Color(0xFFA8660A)),
@@ -237,6 +237,17 @@ class AppSettingsController extends ChangeNotifier {
 
   Future<void> load() async {
     _settings = await repository.load();
+    if (_settings.visualStyleVersion < 1 ||
+        appearance == AppAppearance.system) {
+      _settings = _settings.copyWith(
+        appearance: appearance == AppAppearance.system
+            ? AppAppearance.dark.name
+            : _settings.appearance,
+        accentColor: 'coral',
+        visualStyleVersion: 1,
+      );
+      await repository.save(_settings);
+    }
     _loaded = true;
     notifyListeners();
   }

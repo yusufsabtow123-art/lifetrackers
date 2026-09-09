@@ -6,8 +6,10 @@ import '../domain/goal.dart';
 import '../domain/plan_calculator.dart';
 import 'app_theme.dart';
 import 'create_goal_dialog.dart';
-import 'goal_progress_section.dart';
+import 'goal_progress_update.dart';
+import 'goal_steps_section.dart';
 import 'reminder_dialog.dart';
+import 'progress_format.dart';
 
 enum _GoalMenuAction { editDetails, reminder, plan, removePlan, trash }
 
@@ -19,11 +21,23 @@ Future<void> showGoalDetailsSheet(
   required AppProgressFormat progressFormat,
   required AppSettingsController settings,
 }) {
-  return showModalBottomSheet<void>(
+  return showGeneralDialog<void>(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) => _GoalDetailsSheet(
+    barrierDismissible: true,
+    barrierLabel: 'Close goal',
+    barrierColor: Colors.black26,
+    transitionDuration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 240),
+    transitionBuilder: (context, animation, secondary, child) =>
+        SlideTransition(
+          position: Tween(begin: const Offset(.08, 0), end: Offset.zero)
+              .animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              ),
+          child: FadeTransition(opacity: animation, child: child),
+        ),
+    pageBuilder: (context, animation, secondary) => _GoalDetailsSheet(
       store: store,
       goalId: goalId,
       showAbandoned: showAbandoned,
@@ -71,45 +85,45 @@ class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
               ? Alignment.centerRight
               : Alignment.bottomCenter,
           child: Material(
-            color: context.appPanel,
+            color: width >= 760
+                ? context.appPanel
+                : Theme.of(context).scaffoldBackgroundColor,
             borderRadius: width >= 760
-                ? const BorderRadius.horizontal(left: Radius.circular(24))
-                : const BorderRadius.vertical(top: Radius.circular(24)),
+                ? const BorderRadius.horizontal(left: Radius.circular(12))
+                : BorderRadius.zero,
             child: SafeArea(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: width >= 760 ? 540 : double.infinity,
+                  maxWidth: width >= 760 ? 410 : double.infinity,
+                  minHeight:
+                      MediaQuery.sizeOf(context).height -
+                      MediaQuery.paddingOf(context).vertical,
                   maxHeight:
-                      MediaQuery.sizeOf(context).height *
-                      (width >= 760 ? 1 : .91),
+                      MediaQuery.sizeOf(context).height -
+                      MediaQuery.paddingOf(context).vertical,
                 ),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Container(
-                            width: 46,
-                            height: 46,
-                            decoration: BoxDecoration(
-                              color: plan == null
-                                  ? context.appSoftBlue
-                                  : context.appSoftGreen,
-                              borderRadius: BorderRadius.circular(13),
+                          if (width < 760)
+                            IconButton(
+                              tooltip: 'Close',
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.arrow_back, size: 21),
+                            )
+                          else
+                            const Padding(
+                              padding: EdgeInsets.only(right: 12),
+                              child: Icon(Icons.menu_book_outlined, size: 24),
                             ),
-                            child: Icon(
-                              plan == null
-                                  ? Icons.lightbulb_outline
-                                  : Icons.flag_outlined,
-                              color: plan == null
-                                  ? context.appBlueText
-                                  : context.appGreenText,
-                            ),
-                          ),
-                          const SizedBox(width: 13),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,12 +132,7 @@ class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
                                   goal.name,
                                   style: Theme.of(
                                     context,
-                                  ).textTheme.headlineMedium,
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  goal.status.label,
-                                  style: Theme.of(context).textTheme.bodySmall,
+                                  ).textTheme.titleMedium,
                                 ),
                               ],
                             ),
@@ -165,43 +174,57 @@ class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
                             ],
                             icon: const Icon(Icons.more_horiz_rounded),
                           ),
-                          IconButton(
-                            tooltip: 'Close',
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close_rounded),
-                          ),
+                          if (width >= 760)
+                            IconButton(
+                              tooltip: 'Close',
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.close_rounded),
+                            ),
                         ],
                       ),
-                      const SizedBox(height: 18),
+                      const Divider(height: 28),
                       _TodayActionCard(goal: goal, store: widget.store),
-                      const SizedBox(height: 20),
-                      GoalProgressSection(
+                      const Divider(height: 40),
+                      if (plan != null)
+                        _ReferenceProgress(
+                          goal: goal,
+                          store: widget.store,
+                          health: health,
+                          progressFormat: widget.progressFormat,
+                        )
+                      else
+                        OutlinedButton.icon(
+                          key: const Key('add-amount-target-button'),
+                          onPressed: () =>
+                              _handleMenuAction(_GoalMenuAction.plan, goal),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Add amount target'),
+                        ),
+                      const Divider(height: 40),
+                      GoalStepsSection(
                         goal: goal,
                         store: widget.store,
-                        progressFormat: widget.progressFormat,
-                        onAddAmountPlan: () {
-                          final navigator = Navigator.of(context);
-                          navigator.pop();
-                          showPlanGoalDialog(
-                            navigator.context,
-                            widget.store,
-                            goal.id,
-                          );
-                        },
+                        compact: true,
                       ),
-                      if (plan != null) ...[
-                        const SizedBox(height: 24),
-                        _ScheduleSummary(health: health, goal: goal),
-                      ],
-                      const SizedBox(height: 18),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          key: const Key('edit-goal-details-button'),
-                          onPressed: () => _showGoalSettings(goal),
-                          icon: const Icon(Icons.tune_rounded, size: 18),
-                          label: const Text('Edit goal details'),
+                      const Divider(height: 36),
+                      ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.description_outlined,
+                          size: 19,
                         ),
+                        title: const Text(
+                          'Details',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        children: [
+                          TextButton.icon(
+                            key: const Key('edit-goal-details-button'),
+                            onPressed: () => _showGoalSettings(goal),
+                            icon: const Icon(Icons.tune_rounded, size: 18),
+                            label: const Text('Edit goal details'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -283,7 +306,7 @@ class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
       builder: (context) => AlertDialog(
         title: const Text('Remove this plan?'),
         content: const Text(
-          'The goal will return to Ideas. Its amount, dates, and progress '
+          'The goal will return to To Do. Its amount, dates, and progress '
           'history will be removed. You can undo this from the board.',
         ),
         actions: [
@@ -319,50 +342,48 @@ class _TodayActionCard extends StatelessWidget {
     if (scheduled <= 0 && completion == null) return const SizedBox.shrink();
     final amount = completion?.amount ?? scheduled;
     final done = completion != null;
-    return AnimatedContainer(
+    return Column(
       key: const Key('goal-today-action'),
-      duration: const Duration(milliseconds: 180),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: done ? context.appSoftGreen : context.appSoftBlue,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Checkbox(
-            value: done,
-            onChanged: (_) => done
-                ? store.undoTodayAction(goal.id)
-                : store.completeTodayAction(goal.id),
-          ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  done ? 'Today’s action is done' : 'Today’s action',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${formatAmount(amount)} ${pluralize(plan.unit, amount)}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.my_location_outlined, size: 18, color: context.appMuted),
+            const SizedBox(width: 10),
+            const Text('Next action', style: TextStyle(fontSize: 13)),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Text(
+          '${formatAmount(amount)} ${pluralize(plan.unit, amount)}',
+          style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+          onPressed: () => done
+              ? store.undoTodayAction(goal.id)
+              : store.completeTodayAction(goal.id),
+          icon: Icon(done ? Icons.undo : Icons.check, size: 18),
+          label: Text(done ? 'Completed · Undo' : 'Complete'),
+        ),
+      ],
     );
   }
 }
 
-class _ScheduleSummary extends StatelessWidget {
-  const _ScheduleSummary({required this.health, required this.goal});
+class _ReferenceProgress extends StatelessWidget {
+  const _ReferenceProgress({
+    required this.health,
+    required this.goal,
+    required this.store,
+    required this.progressFormat,
+  });
 
   final GoalHealthSnapshot health;
   final Goal goal;
+  final GoalStore store;
+  final AppProgressFormat progressFormat;
 
   @override
   Widget build(BuildContext context) {
@@ -376,49 +397,90 @@ class _ScheduleSummary extends StatelessWidget {
     final needsMore =
         health.health == GoalHealth.atRisk ||
         health.health == GoalHealth.behind;
-    return Container(
+    return Column(
       key: const Key('goal-schedule-summary'),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.appPanel,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: context.appBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.schedule_rounded, size: 18, color: color),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  health.health.label,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleMedium?.copyWith(color: color),
-                ),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.bar_chart_outlined, size: 18, color: context.appMuted),
+            const SizedBox(width: 10),
+            const Text('Progress & plan', style: TextStyle(fontSize: 13)),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            SizedBox(
+              width: 88,
+              height: 88,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox.expand(
+                    child: CircularProgressIndicator(
+                      value: goal.progress.clamp(0, 1),
+                      strokeWidth: 7,
+                      strokeCap: StrokeCap.round,
+                      backgroundColor: context.appBorder,
+                    ),
+                  ),
+                  if (progressFormat != AppProgressFormat.amount)
+                    Text(
+                      formatProgressPercent(goal.progress),
+                      style: const TextStyle(fontSize: 22),
+                    ),
+                ],
               ),
-              Text(
-                'Due ${_date(plan.deadline)}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-          const SizedBox(height: 11),
-          _MetricRow(
-            label: 'Current pace',
-            value:
-                '${formatAmount(plan.acceptedDailyPace)} ${pluralize(plan.unit, plan.acceptedDailyPace)} per active day',
-          ),
-          if (needsMore)
-            _MetricRow(
-              label: 'Pace needed now',
-              value:
-                  '${formatAmount(health.requiredDailyPace)} ${pluralize(plan.unit, health.requiredDailyPace)} per active day',
             ),
-        ],
-      ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (progressFormat != AppProgressFormat.percentage)
+                    Text(
+                      '${formatAmount(goal.completedAmount)} of ${formatAmount(plan.totalAmount)} ${plan.unit}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.circle, size: 7, color: color),
+                      const SizedBox(width: 6),
+                      Text(
+                        health.health.label,
+                        style: TextStyle(fontSize: 12, color: color),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '${formatAmount(plan.acceptedDailyPace)} ${pluralize(plan.unit, plan.acceptedDailyPace)} per active day',
+                    style: TextStyle(fontSize: 12, color: context.appMuted),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Ends ${_date(plan.deadline)}',
+                    style: TextStyle(fontSize: 12, color: context.appMuted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        if (needsMore)
+          _MetricRow(
+            label: 'Pace needed now',
+            value:
+                '${formatAmount(health.requiredDailyPace)} ${pluralize(plan.unit, health.requiredDailyPace)} per active day',
+          ),
+        GoalProgressUpdate(goal: goal, store: store, label: 'Log progress'),
+      ],
     );
   }
 }
@@ -470,7 +532,9 @@ class _GoalSettingsSheet extends StatelessWidget {
                       ))
                         DropdownMenuItem(
                           value: status,
-                          child: Text(status.label),
+                          child: Text(
+                            status == GoalStatus.ideas ? 'To Do' : status.label,
+                          ),
                         ),
                     ],
                     onChanged: (status) {
@@ -648,5 +712,20 @@ class _MetricRow extends StatelessWidget {
   }
 }
 
-String _date(DateTime value) =>
-    '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+String _date(DateTime value) {
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  return '${months[value.month - 1]} ${value.day}, ${value.year}';
+}

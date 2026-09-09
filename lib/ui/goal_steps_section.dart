@@ -6,10 +6,16 @@ import '../domain/step_batch_parser.dart';
 import 'app_theme.dart';
 
 class GoalStepsSection extends StatefulWidget {
-  const GoalStepsSection({super.key, required this.goal, required this.store});
+  const GoalStepsSection({
+    super.key,
+    required this.goal,
+    required this.store,
+    this.compact = false,
+  });
 
   final Goal goal;
   final GoalStore store;
+  final bool compact;
 
   @override
   State<GoalStepsSection> createState() => _GoalStepsSectionState();
@@ -17,6 +23,7 @@ class GoalStepsSection extends StatefulWidget {
 
 class _GoalStepsSectionState extends State<GoalStepsSection> {
   final _singleStep = TextEditingController();
+  bool _adding = false;
 
   @override
   void dispose() {
@@ -33,10 +40,16 @@ class _GoalStepsSectionState extends State<GoalStepsSection> {
       children: [
         Row(
           children: [
+            if (widget.compact) ...[
+              const Icon(Icons.format_list_bulleted, size: 18),
+              const SizedBox(width: 10),
+            ],
             Expanded(
               child: Text(
                 'Steps',
-                style: Theme.of(context).textTheme.titleLarge,
+                style: widget.compact
+                    ? const TextStyle(fontSize: 13)
+                    : Theme.of(context).textTheme.titleLarge,
               ),
             ),
             if (goal.steps.isNotEmpty)
@@ -74,36 +87,46 @@ class _GoalStepsSectionState extends State<GoalStepsSection> {
           ),
         ],
         const SizedBox(height: 12),
-        TextField(
-          key: const Key('add-goal-step-field'),
-          controller: _singleStep,
-          minLines: 1,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: 'Add one small step',
-            hintText: 'Example: Make sauce',
-            helperText: 'Text containing + or = stays in this one step.',
+        if (widget.compact && !_adding)
+          OutlinedButton.icon(
+            onPressed: () => setState(() => _adding = true),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Add step'),
           ),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            FilledButton.icon(
-              key: const Key('add-goal-step-button'),
-              onPressed: _addSingleStep,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Add step'),
+        if (!widget.compact || _adding) ...[
+          TextField(
+            key: const Key('add-goal-step-field'),
+            controller: _singleStep,
+            minLines: 1,
+            maxLines: 4,
+            decoration: InputDecoration(
+              labelText: 'Add one small step',
+              hintText: 'Example: Make sauce',
+              helperText: widget.compact
+                  ? null
+                  : 'Text containing + or = stays in this one step.',
             ),
-            OutlinedButton.icon(
-              key: const Key('add-many-steps-button'),
-              onPressed: _addManySteps,
-              icon: const Icon(Icons.playlist_add_rounded),
-              label: const Text('Add many steps'),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                key: const Key('add-goal-step-button'),
+                onPressed: _addSingleStep,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add step'),
+              ),
+              OutlinedButton.icon(
+                key: const Key('add-many-steps-button'),
+                onPressed: _addManySteps,
+                icon: const Icon(Icons.playlist_add_rounded),
+                label: const Text('Add many steps'),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

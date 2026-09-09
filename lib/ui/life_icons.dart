@@ -24,13 +24,45 @@ class LifeMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: Size.square(size),
-    painter: _LifeGlyphPainter(
-      glyph: LifeGlyph.goals,
+    painter: _LifeMarkPainter(
       color: context.appText,
-      accent: AppColors.yellow,
-      selected: true,
+      accent: Theme.of(context).colorScheme.primary,
     ),
   );
+}
+
+class _LifeMarkPainter extends CustomPainter {
+  const _LifeMarkPainter({required this.color, required this.accent});
+  final Color color;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 24;
+    final line = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8 * s
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final glow = Paint()
+      ..color = accent
+      ..style = PaintingStyle.fill;
+
+    line.strokeWidth = 2.6 * s;
+    canvas.drawArc(
+      Rect.fromCircle(center: Offset(12 * s, 12 * s), radius: 8.2 * s),
+      -.05,
+      math.pi * 1.72,
+      false,
+      line,
+    );
+    canvas.drawCircle(Offset(18.7 * s, 5.3 * s), 2.15 * s, glow);
+  }
+
+  @override
+  bool shouldRepaint(covariant _LifeMarkPainter oldDelegate) =>
+      color != oldDelegate.color || accent != oldDelegate.accent;
 }
 
 class LifeGlyphIcon extends StatelessWidget {
@@ -53,7 +85,7 @@ class LifeGlyphIcon extends StatelessWidget {
     painter: _LifeGlyphPainter(
       glyph: glyph,
       color: color ?? context.appMuted,
-      accent: AppColors.yellow,
+      accent: Theme.of(context).colorScheme.primary,
       selected: selected,
     ),
   );
@@ -102,13 +134,24 @@ class _LifeGlyphPainter extends CustomPainter {
         canvas.drawLine(p(16, 3.8), p(16, 7), paint);
         canvas.drawCircle(p(12, 15), 1.35 * scale, Paint()..color = accent);
       case LifeGlyph.tasks:
-        canvas.drawRRect(rr(4, 4, 20, 20, 3), paint);
+        canvas.drawCircle(
+          p(12, 12),
+          8 * scale,
+          selected ? (Paint()..color = accent) : paint,
+        );
         canvas.drawPath(
           Path()
             ..moveTo(8 * scale, 12 * scale)
             ..lineTo(11 * scale, 15 * scale)
             ..lineTo(17 * scale, 9 * scale),
-          paint,
+          selected
+              ? (Paint()
+                  ..color = const Color(0xFF192024)
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = 1.6 * scale
+                  ..strokeCap = StrokeCap.round
+                  ..strokeJoin = StrokeJoin.round)
+              : paint,
         );
       case LifeGlyph.calendar:
         canvas.drawRRect(rr(4, 5.5, 20, 20, 2.8), paint);

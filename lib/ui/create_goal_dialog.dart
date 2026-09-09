@@ -138,7 +138,7 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
                     child: Text(
                       _planning
                           ? (_isExisting ? 'Add a plan' : 'Plan this goal')
-                          : 'Capture an idea',
+                          : 'Create a goal without a plan',
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                   ),
@@ -217,7 +217,7 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
                     FilledButton(
                       key: const Key('add-to-ideas-button'),
                       onPressed: _saving ? null : _quickCreate,
-                      child: const Text('Save idea'),
+                      child: const Text('Create goal'),
                     ),
                   ],
                 )

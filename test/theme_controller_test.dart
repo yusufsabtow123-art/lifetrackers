@@ -12,7 +12,7 @@ void main() {
     await controller.load();
     expect(controller.appearance, AppAppearance.dark);
     expect(controller.themeMode, ThemeMode.dark);
-    expect(controller.accentColor, AppAccentColor.violet);
+    expect(controller.accentColor, AppAccentColor.coral);
     expect(controller.progressFormat, AppProgressFormat.both);
 
     await controller.setAppearance(AppAppearance.dark);
@@ -117,7 +117,7 @@ void main() {
 
     expect(settings.appearance, 'dark');
     expect(settings.showAbandoned, isTrue);
-    expect(settings.accentColor, 'violet');
+    expect(settings.accentColor, 'coral');
     expect(settings.progressFormat, 'both');
   });
 

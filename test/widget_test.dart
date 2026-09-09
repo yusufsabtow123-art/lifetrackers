@@ -50,6 +50,9 @@ void main() {
     expect(find.byKey(Key('toggle-urgent-${goal.id}')), findsNothing);
     await tester.tap(find.text(goal.name));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Details'));
+    await tester.tap(find.text('Details'));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const Key('edit-goal-details-button')),
     );
@@ -371,13 +374,8 @@ void main() {
     await tester.tap(find.text('Read the Quran'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.descendant(
-        of: find.byType(BottomSheet),
-        matching: find.text('0.3% · 2 of 604 pages'),
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('0.3%'), findsOneWidget);
+    expect(find.text('2 of 604 pages'), findsOneWidget);
     expect(find.text('0% · 2 of 604 pages'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });
@@ -753,7 +751,7 @@ void main() {
     expect(store.goalById(goal.id)?.status, GoalStatus.abandoned);
   });
 
-  testWidgets('Settings saves accent color and progress format', (
+  testWidgets('Settings saves fixed-identity appearance and progress format', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1200, 900));
@@ -774,7 +772,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Appearance'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('accent-rose')));
+    await tester.tap(find.byKey(const Key('appearance-light')));
     await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -783,9 +781,11 @@ void main() {
     await tester.tap(find.byKey(const Key('progress-format-amount')));
     await tester.pumpAndSettle();
 
-    expect(settings.accentColor, AppAccentColor.rose);
+    expect(settings.appearance, AppAppearance.light);
+    expect(settings.accentColor, AppAccentColor.coral);
     expect(settings.progressFormat, AppProgressFormat.amount);
-    expect(repository.settings.accentColor, 'rose');
+    expect(repository.settings.appearance, 'light');
+    expect(repository.settings.accentColor, 'coral');
     expect(repository.settings.progressFormat, 'amount');
   });
 
@@ -816,7 +816,7 @@ void main() {
     expect(find.text('Appearance'), findsOneWidget);
     await tester.tap(find.text('Appearance'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('accent-ocean')));
+    await tester.tap(find.byKey(const Key('appearance-light')));
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Board and categories'));
@@ -826,11 +826,12 @@ void main() {
     await tester.tap(find.byKey(const Key('progress-format-percentage')));
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Local data'));
-    await tester.tap(find.text('Local data'));
+    await tester.ensureVisible(find.text('Data'));
+    await tester.tap(find.text('Data'));
     await tester.pumpAndSettle();
 
-    expect(settings.accentColor, AppAccentColor.ocean);
+    expect(settings.appearance, AppAppearance.light);
+    expect(settings.accentColor, AppAccentColor.coral);
     expect(settings.progressFormat, AppProgressFormat.percentage);
     expect(find.byKey(const Key('open-local-folder-setting')), findsOneWidget);
     expect(find.textContaining('Markdown'), findsWidgets);
@@ -861,7 +862,7 @@ void main() {
     await tester.tap(find.text('Make lasagna'));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('unified-progress-section')), findsOneWidget);
+    expect(find.text('Progress & plan'), findsOneWidget);
     expect(find.byKey(const Key('log-amount-progress-button')), findsOneWidget);
     expect(find.text('Goal updates'), findsNothing);
     expect(find.text('Update the whole goal'), findsNothing);

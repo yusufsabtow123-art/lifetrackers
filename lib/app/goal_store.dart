@@ -168,6 +168,31 @@ class GoalStore extends ChangeNotifier {
     return goal;
   }
 
+  Future<Goal> duplicateGoal(String goalId) async {
+    final source = _find(goalId);
+    if (source == null) throw ArgumentError.value(goalId, 'goalId');
+    final now = _clock();
+    final duplicate = Goal(
+      id: _newId('${source.name} copy', now),
+      name: '${source.name} copy',
+      status: source.status,
+      createdAt: now,
+      updatedAt: now,
+      category: source.category,
+      isUrgent: false,
+      plan: source.plan,
+      completedAmount: source.completedAmount,
+      progressHistory: source.progressHistory,
+      dailyActionCompletions: source.dailyActionCompletions,
+      steps: source.steps,
+      updates: source.updates,
+    );
+    _goals.add(duplicate);
+    notifyListeners();
+    await _save(duplicate);
+    return duplicate;
+  }
+
   Future<void> moveGoal(String goalId, GoalStatus status) async {
     final goal = _find(goalId);
     if (goal == null || goal.status == status) return;

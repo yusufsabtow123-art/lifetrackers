@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:goal_tracker_poc/app/goal_store.dart';
@@ -9,6 +10,64 @@ import 'package:goal_tracker_poc/domain/life_data.dart';
 import 'package:goal_tracker_poc/ui/goal_app.dart';
 
 void main() {
+  testWidgets('editing an undated task preserves its unscheduled state', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final tasks = LifeStore(MemoryLifeRepository());
+    await tasks.load();
+    await tasks.addTask(title: 'Undated task');
+    await tester.pumpWidget(
+      GoalApp(
+        store: GoalStore(repository: MemoryGoalRepository()),
+        lifeStore: tasks,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tasks').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Undated task'));
+    await tester.pumpAndSettle();
+    expect(find.text('No date'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('task-title-field')),
+      'Still undated',
+    );
+    await tester.ensureVisible(find.byKey(const Key('task-save-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('task-save-button')));
+    await tester.pumpAndSettle();
+    expect(tasks.tasks.single.title, 'Still undated');
+    expect(tasks.tasks.single.dueAt, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('compact Android screens keep all four pages usable', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 740);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      GoalApp(
+        store: GoalStore(repository: MemoryGoalRepository()),
+        lifeStore: LifeStore(MemoryLifeRepository()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final page in ['Goals', 'Tasks', 'Calendar', 'More']) {
+      await tester.tap(find.text(page).last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: page);
+    }
+  });
+
   testWidgets('mobile shell keeps the approved goal board and new pages', (
     tester,
   ) async {
@@ -24,7 +83,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Today'), findsWidgets);
-    expect(find.text('Daily actions'), findsOneWidget);
+    expect(find.text('Daily plan'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Goals').last);
@@ -36,7 +95,7 @@ void main() {
 
     await tester.tap(find.text('Calendar').last);
     await tester.pumpAndSettle();
-    expect(find.text('Blocked times are shown'), findsOneWidget);
+    expect(find.byTooltip('Calendar options'), findsOneWidget);
     expect(find.byKey(const Key('calendar-day-timeline')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -58,7 +117,7 @@ void main() {
     await tester.tap(find.text('Calendar').last);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('calendar-add-button')));
+    await tester.tap(find.byKey(const Key('calendar-floating-add-button')));
     await tester.pumpAndSettle();
     expect(find.text('Add to calendar'), findsWidgets);
     await tester.enterText(
@@ -91,6 +150,36 @@ void main() {
     expect(tester.takeException(), isNull);
     Navigator.of(tester.element(find.text('Edit calendar item'))).pop();
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('holding and dragging on the timeline creates a time range', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final goals = GoalStore(repository: MemoryGoalRepository());
+    final lifeStore = LifeStore(MemoryLifeRepository());
+
+    await tester.pumpWidget(GoalApp(store: goals, lifeStore: lifeStore));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Calendar').last);
+    await tester.pumpAndSettle();
+
+    final date = goals.today;
+    final timeline = find.byKey(
+      ValueKey('calendar-timeline-${date.year}-${date.month}-${date.day}'),
+    );
+    expect(timeline, findsOneWidget);
+    final start = tester.getCenter(timeline);
+    final gesture = await tester.startGesture(start);
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    await gesture.moveBy(const Offset(0, 54));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add to calendar'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
@@ -181,7 +270,7 @@ void main() {
     await tester.tap(
       find.descendant(
         of: find.byKey(ValueKey(task.id)),
-        matching: find.byIcon(Icons.radio_button_unchecked_rounded),
+        matching: find.byIcon(Icons.circle_outlined),
       ),
     );
     await tester.pumpAndSettle();
@@ -206,6 +295,8 @@ void main() {
       find.byKey(const Key('task-title-field')),
       'Edited daily task',
     );
+    await tester.ensureVisible(find.byKey(const Key('task-save-button')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('task-save-button')));
     await tester.pumpAndSettle();
 
@@ -248,10 +339,13 @@ void main() {
 
     expect(find.byKey(const Key('goal-today-action')), findsOneWidget);
     expect(find.byKey(const Key('goal-schedule-summary')), findsOneWidget);
-    expect(find.byKey(const Key('unified-progress-section')), findsOneWidget);
+    expect(find.text('Progress & plan'), findsOneWidget);
     expect(find.text('Board column'), findsNothing);
     expect(find.text('Organize'), findsNothing);
-    expect(find.byKey(const Key('edit-goal-details-button')), findsOneWidget);
+    expect(find.byKey(const Key('edit-goal-details-button')), findsNothing);
+    await tester.ensureVisible(find.text('Details'));
+    await tester.tap(find.text('Details'));
+    await tester.pumpAndSettle();
 
     await tester.ensureVisible(
       find.byKey(const Key('edit-goal-details-button')),
@@ -276,7 +370,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Calendar').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Month'));
+    await tester.tap(find.byTooltip('Month'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('calendar-month-view')), findsOneWidget);
@@ -286,6 +380,10 @@ void main() {
   testWidgets('wide calendar fills its panel without layout errors', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.binding.setSurfaceSize(const Size(1200, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -299,7 +397,7 @@ void main() {
     await tester.tap(find.text('Calendar').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Blocked times are shown'), findsOneWidget);
+    expect(find.text('Blocked times'), findsOneWidget);
     expect(find.byIcon(Icons.playlist_add_rounded), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

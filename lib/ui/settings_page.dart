@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/goal_store.dart';
+import '../app/life_store.dart';
 import '../app/theme_controller.dart';
 import '../domain/goal.dart';
 import '../platform/goal_notification_service.dart';
@@ -12,11 +13,13 @@ class SettingsPage extends StatelessWidget {
     super.key,
     required this.store,
     required this.settings,
+    this.lifeStore,
     this.notificationService,
   });
 
   final GoalStore store;
   final AppSettingsController settings;
+  final LifeStore? lifeStore;
   final GoalNotificationService? notificationService;
 
   @override
@@ -24,8 +27,8 @@ class SettingsPage extends StatelessWidget {
     final entries = <_SettingsEntry>[
       _SettingsEntry(
         'Appearance',
-        'Light or dark mode, your accent, and its automatic matching color.',
-        Icons.palette_outlined,
+        'Choose Light or Dark. Life Tracker keeps one consistent identity.',
+        Icons.contrast_rounded,
         () => _open(context, 'Appearance', _AppearanceSettings(settings)),
       ),
       _SettingsEntry(
@@ -51,10 +54,10 @@ class SettingsPage extends StatelessWidget {
         ),
       ),
       _SettingsEntry(
-        'Plans and adaptation',
+        'Goal scheduling',
         'Automatic starts, connected goals, and schedule-warning behavior.',
         Icons.route_outlined,
-        () => _open(context, 'Plans and adaptation', _PlanSettings(settings)),
+        () => _open(context, 'Goal scheduling', _PlanSettings(settings)),
       ),
       _SettingsEntry(
         'Android widgets',
@@ -65,58 +68,192 @@ class SettingsPage extends StatelessWidget {
       ),
       _SettingsEntry(
         'Local data',
-        'Readable Markdown files and the folder containing your goals.',
+        lifeStore == null
+            ? 'Readable Markdown files stored on this device.'
+            : 'Goals, tasks, and calendar stay readable and on this device.',
         Icons.folder_outlined,
         () => _open(context, 'Local data', _LocalDataSettings(store)),
       ),
     ];
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Settings', style: Theme.of(context).textTheme.displaySmall),
-              const SizedBox(height: 7),
-              Text(
-                'Everything saves automatically on this device. Open only the '
-                'section you need.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: context.appMuted),
-              ),
-              const SizedBox(height: 22),
-              Text(
-                'Preferences',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
-              Container(
-                decoration: BoxDecoration(
-                  color: context.appPanel,
-                  border: Border.all(color: context.appBorder),
-                  borderRadius: BorderRadius.circular(8),
+    return AnimatedBuilder(
+      animation: settings,
+      builder: (context, _) => MediaQuery.sizeOf(context).width >= 820
+          ? _desktopSettings(context, entries)
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
+              children: [
+                _ReferenceSettingRow(
+                  icon: Icons.light_mode_outlined,
+                  title: 'Appearance',
+                  value: settings.appearance.name,
+                  onTap: entries[0].onTap,
                 ),
-                child: Column(
+                _ReferenceSettingRow(
+                  icon: Icons.notifications_outlined,
+                  title: 'Notifications',
+                  value: settings.notificationsEnabled ? 'On' : 'Off',
+                  onTap: entries[3].onTap,
+                ),
+                _ReferenceSettingRow(
+                  icon: Icons.calendar_today_outlined,
+                  title: 'Calendar',
+                  value: '',
+                  onTap: entries[4].onTap,
+                ),
+                _ReferenceSettingRow(
+                  icon: Icons.folder_outlined,
+                  title: 'Data',
+                  value: 'On this device',
+                  onTap: entries[6].onTap,
+                ),
+                _ReferenceSettingRow(
+                  icon: Icons.accessibility_new_rounded,
+                  title: 'Accessibility',
+                  value: 'Uses device settings',
+                  onTap: () => _open(
+                    context,
+                    'Accessibility',
+                    const _AccessibilitySettings(),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Goals & device',
+                  style: TextStyle(fontSize: 12, color: context.appMuted),
+                ),
+                const SizedBox(height: 8),
+                _ReferenceSettingRow(
+                  icon: entries[1].icon,
+                  title: 'Board and categories',
+                  value: '',
+                  onTap: entries[1].onTap,
+                ),
+                _ReferenceSettingRow(
+                  icon: entries[2].icon,
+                  title: 'Opened goals',
+                  value: '',
+                  onTap: entries[2].onTap,
+                ),
+                _ReferenceSettingRow(
+                  icon: entries[5].icon,
+                  title: 'Android widgets',
+                  value: '',
+                  onTap: entries[5].onTap,
+                ),
+                const SizedBox(height: 28),
+                Text(
+                  'Private by default · Saved automatically',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: context.appMuted),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _desktopSettings(BuildContext context, List<_SettingsEntry> entries) =>
+      ListView(
+        padding: const EdgeInsets.fromLTRB(32, 26, 32, 40),
+        children: [
+          Text('Settings', style: Theme.of(context).textTheme.displaySmall),
+          const SizedBox(height: 4),
+          Text(
+            'Make Life Tracker work for you.',
+            style: TextStyle(color: context.appMuted),
+          ),
+          const SizedBox(height: 24),
+          _InlineSettingsGroup(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(15, 14, 15, 13),
+                child: Row(
                   children: [
-                    for (var index = 0; index < entries.length; index++) ...[
-                      _SettingsTile(entry: entries[index]),
-                      if (index < entries.length - 1)
-                        Divider(color: context.appBorder),
-                    ],
+                    const Icon(Icons.contrast_rounded, size: 19),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Appearance',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    _AppearancePreview(
+                      appearance: AppAppearance.light,
+                      selected: settings.appearance == AppAppearance.light,
+                      onTap: () => settings.setAppearance(AppAppearance.light),
+                    ),
+                    const SizedBox(width: 8),
+                    _AppearancePreview(
+                      appearance: AppAppearance.dark,
+                      selected: settings.appearance == AppAppearance.dark,
+                      onTap: () => settings.setAppearance(AppAppearance.dark),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
+          const SizedBox(height: 10),
+          _InlineSettingsGroup(
+            children: [
+              _InlineSettingsRow(
+                icon: Icons.notifications_none_rounded,
+                title: 'Notifications',
+                subtitle: 'Daily reminders and completion check-ins',
+                onTap: entries[3].onTap,
+                trailing: Switch(
+                  value: settings.notificationsEnabled,
+                  onChanged: settings.setNotificationsEnabled,
+                ),
+              ),
+              _InlineSettingsRow(
+                icon: Icons.calendar_today_outlined,
+                title: 'Calendar',
+                subtitle: 'Scheduling, recurrence, and plan warnings',
+                onTap: entries[4].onTap,
+                trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+              ),
+              _InlineSettingsRow(
+                icon: Icons.storage_outlined,
+                title: 'Data',
+                subtitle: 'Goals, tasks, and calendar stay on this device',
+                onTap: entries[6].onTap,
+                trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _InlineSettingsGroup(
+            children: [
+              _InlineSettingsRow(
+                icon: Icons.accessibility_new_rounded,
+                title: 'Accessibility',
+                subtitle: 'System text and motion settings are respected',
+                onTap: () => _open(
+                  context,
+                  'Accessibility',
+                  const _AccessibilitySettings(),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+              ),
+              _InlineSettingsRow(
+                icon: entries[1].icon,
+                title: 'Goals and board',
+                subtitle: 'Categories, progress labels, and board behavior',
+                onTap: entries[1].onTap,
+                trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+              ),
+              _InlineSettingsRow(
+                icon: entries[5].icon,
+                title: 'Android widgets',
+                subtitle: 'Choose which actions and progress appear',
+                onTap: entries[5].onTap,
+                trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+              ),
+            ],
+          ),
+        ],
+      );
 
   void _open(BuildContext context, String title, Widget child) {
     Navigator.of(context).push(
@@ -141,6 +278,50 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
+class _ReferenceSettingRow extends StatelessWidget {
+  const _ReferenceSettingRow({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String title;
+  final String value;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 2),
+    child: Material(
+      color: context.appPanel,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, size: 19, color: context.appText),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(title, style: const TextStyle(fontSize: 14)),
+              ),
+              if (value.isNotEmpty)
+                Text(
+                  value[0].toUpperCase() + value.substring(1),
+                  style: TextStyle(fontSize: 12, color: context.appMuted),
+                ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right, size: 16, color: context.appMuted),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class _SettingsEntry {
   const _SettingsEntry(this.title, this.description, this.icon, this.onTap);
   final String title;
@@ -149,42 +330,143 @@ class _SettingsEntry {
   final VoidCallback onTap;
 }
 
-class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({required this.entry});
-  final _SettingsEntry entry;
+class _InlineSettingsGroup extends StatelessWidget {
+  const _InlineSettingsGroup({required this.children});
+
+  final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.transparent,
-    child: InkWell(
-      borderRadius: BorderRadius.circular(7),
-      onTap: entry.onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(entry.icon, size: 18, color: context.appMuted),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    entry.description,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(maxWidth: 880),
+    decoration: BoxDecoration(
+      color: context.appPanel,
+      borderRadius: BorderRadius.circular(9),
+      border: Border.all(color: context.appBorder),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      children: [
+        for (var index = 0; index < children.length; index++) ...[
+          children[index],
+          if (index != children.length - 1)
+            Divider(height: 1, color: context.appBorder),
+        ],
+      ],
+    ),
+  );
+}
+
+class _InlineSettingsRow extends StatelessWidget {
+  const _InlineSettingsRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    required this.trailing,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+      child: Row(
+        children: [
+          Icon(icon, size: 19),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 11, color: context.appMuted),
+                ),
+              ],
             ),
-            const Icon(Icons.chevron_right_rounded),
-          ],
+          ),
+          const SizedBox(width: 12),
+          trailing,
+        ],
+      ),
+    ),
+  );
+}
+
+class _AppearancePreview extends StatelessWidget {
+  const _AppearancePreview({
+    required this.appearance,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppAppearance appearance;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    key: Key('appearance-${appearance.name}'),
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(7),
+    child: Container(
+      width: 84,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: appearance == AppAppearance.dark
+            ? const Color(0xFF101518)
+            : const Color(0xFFF4F3EF),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(
+          color: selected ? AppColors.coral : context.appBorder,
+          width: selected ? 1.5 : 1,
         ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 16,
+                height: 22,
+                color: appearance == AppAppearance.dark
+                    ? const Color(0xFF1B2226)
+                    : const Color(0xFFE1E2DF),
+              ),
+              const SizedBox(width: 3),
+              Expanded(
+                child: Container(
+                  height: 22,
+                  color: appearance == AppAppearance.dark
+                      ? const Color(0xFF242B2F)
+                      : Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            appearance.label,
+            style: TextStyle(
+              fontSize: 9,
+              color: appearance == AppAppearance.dark
+                  ? Colors.white
+                  : Colors.black87,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     ),
   );
@@ -221,7 +503,10 @@ class _AppearanceSettings extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final appearance in AppAppearance.values)
+            for (final appearance in const [
+              AppAppearance.light,
+              AppAppearance.dark,
+            ])
               ChoiceChip(
                 key: Key('appearance-${appearance.name}'),
                 selected: settings.appearance == appearance,
@@ -231,112 +516,42 @@ class _AppearanceSettings extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 24),
-        Text('Accent color', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 6),
-        const Text(
-          'The app automatically creates a complementary second color for '
-          'reminders and secondary actions.',
-        ),
-        const SizedBox(height: 14),
-        for (final group in AppAccentGroup.values) ...[
-          Text(group.label, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              for (final accent in AppAccentColor.values.where(
-                (item) => item.group == group,
-              ))
-                _AccentSwatch(
-                  accent: accent,
-                  selected: settings.accentColor == accent,
-                  onTap: () => settings.setAccentColor(accent),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-        ],
-        Row(
-          children: [
-            Expanded(
-              child: _ColorPreview(
-                label: 'Main color',
-                color: settings.accentColor.color,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _ColorPreview(
-                label: 'Matching color',
-                color: settings.accentColor.complementaryColor,
-              ),
-            ),
-          ],
-        ),
       ],
     ),
   );
 }
 
-class _AccentSwatch extends StatelessWidget {
-  const _AccentSwatch({
-    required this.accent,
-    required this.selected,
-    required this.onTap,
-  });
-  final AppAccentColor accent;
-  final bool selected;
-  final VoidCallback onTap;
+class _AccessibilitySettings extends StatelessWidget {
+  const _AccessibilitySettings();
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: accent.label,
-    child: InkWell(
-      key: Key('accent-${accent.name}'),
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(13),
-      child: Container(
-        width: 46,
-        height: 46,
-        decoration: BoxDecoration(
-          color: accent.color,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(
-            color: selected ? context.appText : context.appBorder,
-            width: selected ? 3 : 1,
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final scale = media.textScaler.scale(1);
+    return _SettingsCard(
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.text_fields_rounded),
+          title: const Text('Text size'),
+          subtitle: const Text(
+            'Life Tracker follows the text size selected on this device.',
           ),
+          trailing: Text('${(scale * 100).round()}%'),
         ),
-        child: selected
-            ? Icon(Icons.check_rounded, color: accent.foregroundColor)
-            : null,
-      ),
-    ),
-  );
-}
-
-class _ColorPreview extends StatelessWidget {
-  const _ColorPreview({required this.label, required this.color});
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(
-      color: Color.alphaBlend(
-        color.withValues(alpha: context.isDarkMode ? .24 : .13),
-        context.appPanel,
-      ),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: color.withValues(alpha: .5)),
-    ),
-    child: Text(
-      label,
-      style: TextStyle(color: color, fontWeight: FontWeight.w700),
-    ),
-  );
+        const Divider(),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.motion_photos_off_outlined),
+          title: const Text('Reduced motion'),
+          subtitle: const Text(
+            'Animations become simpler when the device requests reduced motion.',
+          ),
+          trailing: Text(media.disableAnimations ? 'On' : 'Off'),
+        ),
+      ],
+    );
+  }
 }
 
 class _BoardSettings extends StatelessWidget {

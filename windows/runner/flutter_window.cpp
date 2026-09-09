@@ -1,8 +1,12 @@
 #include "flutter_window.h"
 
+#include <commdlg.h>
+
+#include <iterator>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "utils.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -25,6 +29,39 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  file_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "life_tracker/files",
+          &flutter::StandardMethodCodec::GetInstance());
+  file_channel_->SetMethodCallHandler(
+      [this](const auto& call, auto result) {
+        if (call.method_name() != "chooseScheduleFile") {
+          result->NotImplemented();
+          return;
+        }
+        wchar_t path[32768] = {};
+        OPENFILENAMEW dialog = {};
+        dialog.lStructSize = sizeof(dialog);
+        dialog.hwndOwner = GetHandle();
+        dialog.lpstrFile = path;
+        dialog.nMaxFile = static_cast<DWORD>(std::size(path));
+        dialog.lpstrFilter =
+            L"Schedule files (*.tsv;*.csv;*.txt)\0*.tsv;*.csv;*.txt\0"
+            L"All files (*.*)\0*.*\0\0";
+        dialog.nFilterIndex = 1;
+        dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST |
+                       OFN_HIDEREADONLY | OFN_EXPLORER;
+        if (::GetOpenFileNameW(&dialog)) {
+          result->Success(flutter::EncodableValue(Utf8FromUtf16(path)));
+          return;
+        }
+        const DWORD error = ::CommDlgExtendedError();
+        if (error == 0) {
+          result->Success(flutter::EncodableValue());
+        } else {
+          result->Error("file_dialog_failed", "Could not open file picker.");
+        }
+      });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {

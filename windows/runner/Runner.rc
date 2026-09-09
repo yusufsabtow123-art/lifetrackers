@@ -92,9 +92,9 @@ BEGIN
             VALUE "CompanyName", "app.localfirst" "\0"
             VALUE "FileDescription", "Life Tracker" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "goal_tracker_poc" "\0"
+            VALUE "InternalName", "LifeTracker" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 app.localfirst. All rights reserved." "\0"
-            VALUE "OriginalFilename", "goal_tracker_poc.exe" "\0"
+            VALUE "OriginalFilename", "LifeTracker.exe" "\0"
             VALUE "ProductName", "Life Tracker" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END

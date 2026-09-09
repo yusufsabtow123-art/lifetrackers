@@ -51,6 +51,11 @@ class MarkdownLifeRepository implements LifeRepository {
     if (data.tasks.isEmpty) buffer.writeln('- No tasks yet.');
     for (final task in data.tasks) {
       buffer.writeln('- [${task.isCompleted ? 'x' : ' '}] ${task.title}');
+      for (final note in task.completionNotes) {
+        buffer.writeln(
+          '  - ${note.day.toIso8601String().split('T').first}: ${note.text}',
+        );
+      }
     }
     buffer.writeln();
     buffer.writeln('## Calendar');

@@ -6,7 +6,7 @@ import 'app_data_path.dart';
 class AppSettingsData {
   const AppSettingsData({
     this.appearance = 'dark',
-    this.accentColor = 'violet',
+    this.accentColor = 'coral',
     this.progressFormat = 'both',
     this.showAbandoned = false,
     this.compactGoalIds = const {},
@@ -50,6 +50,7 @@ class AppSettingsData {
     this.widgetGoalScope = 'active',
     this.widgetCategory = '',
     this.widgetMaxCards = 3,
+    this.visualStyleVersion = 0,
   });
 
   final String appearance;
@@ -88,6 +89,7 @@ class AppSettingsData {
   final String widgetGoalScope;
   final String widgetCategory;
   final int widgetMaxCards;
+  final int visualStyleVersion;
 
   AppSettingsData copyWith({
     String? appearance,
@@ -126,6 +128,7 @@ class AppSettingsData {
     String? widgetGoalScope,
     String? widgetCategory,
     int? widgetMaxCards,
+    int? visualStyleVersion,
   }) => AppSettingsData(
     appearance: appearance ?? this.appearance,
     accentColor: accentColor ?? this.accentColor,
@@ -168,6 +171,7 @@ class AppSettingsData {
     widgetGoalScope: widgetGoalScope ?? this.widgetGoalScope,
     widgetCategory: widgetCategory ?? this.widgetCategory,
     widgetMaxCards: widgetMaxCards ?? this.widgetMaxCards,
+    visualStyleVersion: visualStyleVersion ?? this.visualStyleVersion,
   );
 
   Map<String, Object?> toJson() => {
@@ -207,6 +211,7 @@ class AppSettingsData {
     'widget_goal_scope': widgetGoalScope,
     'widget_category': widgetCategory,
     'widget_max_cards': widgetMaxCards,
+    'visual_style_version': visualStyleVersion,
   };
 
   static AppSettingsData fromJson(Object? value) {
@@ -282,6 +287,7 @@ class AppSettingsData {
           value['widget_goal_scope'] as String? ?? d.widgetGoalScope,
       widgetCategory: value['widget_category'] as String? ?? d.widgetCategory,
       widgetMaxCards: intOf('widget_max_cards', d.widgetMaxCards),
+      visualStyleVersion: intOf('visual_style_version', d.visualStyleVersion),
     );
   }
 }

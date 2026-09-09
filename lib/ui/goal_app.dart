@@ -435,7 +435,11 @@ class _GoalAppState extends State<GoalApp> {
                           Icons.radio_button_unchecked_rounded,
                         ),
                         title: Text(goal.name),
-                        subtitle: Text(goal.status.label),
+                        subtitle: Text(
+                          goal.status == GoalStatus.ideas
+                              ? 'To Do'
+                              : goal.status.label,
+                        ),
                         onTap: () {
                           Navigator.pop(context);
                           final appContext = _navigatorKey.currentContext;
@@ -478,10 +482,10 @@ class _GoalAppState extends State<GoalApp> {
         navigatorKey: _navigatorKey,
         debugShowCheckedModeBanner: false,
         title: 'Life Tracker',
-        theme: buildAppTheme(accentColor: _settings.accentColor.color),
+        theme: buildAppTheme(accentColor: AppColors.coral),
         darkTheme: buildAppTheme(
           brightness: Brightness.dark,
-          accentColor: _settings.accentColor.color,
+          accentColor: AppColors.coral,
         ),
         themeMode: _settings.themeMode,
         home: widget.lifeStore == null

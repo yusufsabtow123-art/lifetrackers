@@ -3,11 +3,11 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('v0.13.1 advances beyond every published preview build', () {
+  test('v0.15.0 advances beyond every published preview build', () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
 
-    expect(pubspec, contains('version: 0.13.1+2019'));
+    expect(pubspec, contains('version: 0.15.0+2030'));
     expect(
       gradle,
       contains('applicationId = "app.localfirst.goal_tracker_poc"'),

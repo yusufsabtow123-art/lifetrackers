@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 enum TaskRepeat {
   none('Does not repeat'),
   daily('Every day'),
@@ -24,6 +26,7 @@ class LifeTask {
     this.repeat = TaskRepeat.none,
     this.completedAt,
     this.completedDates = const [],
+    this.completionNotes = const [],
     this.location = '',
     this.spaceId = LifeSpace.personalId,
     this.assignee = '',
@@ -37,6 +40,7 @@ class LifeTask {
   final TaskRepeat repeat;
   final DateTime? completedAt;
   final List<DateTime> completedDates;
+  final List<TaskCompletionNote> completionNotes;
   final DateTime createdAt;
   final String location;
   final String spaceId;
@@ -47,6 +51,13 @@ class LifeTask {
   bool isDoneOn(DateTime day) => repeat == TaskRepeat.none
       ? isCompleted
       : completedDates.any((date) => _sameDate(date, day));
+
+  TaskCompletionNote? completionNoteFor(DateTime day) {
+    for (final note in completionNotes.reversed) {
+      if (_sameDate(note.day, day)) return note;
+    }
+    return null;
+  }
 
   bool occursOn(DateTime day) {
     final due = dueAt;
@@ -73,6 +84,7 @@ class LifeTask {
     DateTime? completedAt,
     bool clearCompleted = false,
     List<DateTime>? completedDates,
+    List<TaskCompletionNote>? completionNotes,
     String? location,
     String? spaceId,
     String? assignee,
@@ -85,6 +97,7 @@ class LifeTask {
     repeat: repeat ?? this.repeat,
     completedAt: clearCompleted ? null : completedAt ?? this.completedAt,
     completedDates: completedDates ?? this.completedDates,
+    completionNotes: completionNotes ?? this.completionNotes,
     createdAt: createdAt,
     location: location ?? this.location,
     spaceId: spaceId ?? this.spaceId,
@@ -102,6 +115,7 @@ class LifeTask {
     'completedDates': completedDates
         .map((date) => date.toIso8601String())
         .toList(),
+    'completionNotes': completionNotes.map((note) => note.toJson()).toList(),
     'createdAt': createdAt.toIso8601String(),
     'location': location,
     'spaceId': spaceId,
@@ -120,11 +134,43 @@ class LifeTask {
         .map(_date)
         .whereType<DateTime>()
         .toList(),
+    completionNotes: (json['completionNotes'] as List<Object?>? ?? const [])
+        .whereType<Map>()
+        .map(
+          (item) =>
+              TaskCompletionNote.fromJson(Map<String, Object?>.from(item)),
+        )
+        .toList(),
     createdAt: _date(json['createdAt']) ?? DateTime.now(),
     location: json['location'] as String? ?? '',
     spaceId: json['spaceId'] as String? ?? LifeSpace.personalId,
     assignee: json['assignee'] as String? ?? '',
   );
+}
+
+class TaskCompletionNote {
+  const TaskCompletionNote({
+    required this.day,
+    required this.recordedAt,
+    required this.text,
+  });
+
+  final DateTime day;
+  final DateTime recordedAt;
+  final String text;
+
+  Map<String, Object?> toJson() => {
+    'day': day.toIso8601String(),
+    'recordedAt': recordedAt.toIso8601String(),
+    'text': text,
+  };
+
+  factory TaskCompletionNote.fromJson(Map<String, Object?> json) =>
+      TaskCompletionNote(
+        day: _date(json['day']) ?? DateTime.now(),
+        recordedAt: _date(json['recordedAt']) ?? DateTime.now(),
+        text: json['text'] as String? ?? '',
+      );
 }
 
 enum CalendarEntryKind { event, blockedTime }
@@ -133,7 +179,9 @@ enum CalendarRepeat {
   none('Does not repeat'),
   daily('Every day'),
   weekdays('Weekdays'),
-  weekly('Every week');
+  weekly('Every week'),
+  monthly('Every month'),
+  yearly('Every year');
 
   const CalendarRepeat(this.label);
   final String label;
@@ -156,6 +204,9 @@ class CalendarEntry {
     this.enabled = true,
     this.spaceId = LifeSpace.personalId,
     this.repeat = CalendarRepeat.none,
+    this.repeatInterval = 1,
+    this.repeatWeekdays = const <int>{},
+    this.repeatUntil,
     this.colorValue,
   });
 
@@ -168,6 +219,9 @@ class CalendarEntry {
   final bool enabled;
   final String spaceId;
   final CalendarRepeat repeat;
+  final int repeatInterval;
+  final Set<int> repeatWeekdays;
+  final DateTime? repeatUntil;
   final int? colorValue;
 
   bool occursOn(DateTime day) {
@@ -175,12 +229,21 @@ class CalendarEntry {
       final occurrenceDay = DateTime(day.year, day.month, day.day);
       final firstDay = DateTime(start.year, start.month, start.day);
       if (occurrenceDay.isBefore(firstDay)) return false;
-      return switch (repeat) {
-        CalendarRepeat.none => false,
-        CalendarRepeat.daily => true,
-        CalendarRepeat.weekdays => occurrenceDay.weekday <= DateTime.friday,
-        CalendarRepeat.weekly => occurrenceDay.weekday == firstDay.weekday,
-      };
+      if (_repeatMatches(occurrenceDay, firstDay)) return true;
+      final previousDay = occurrenceDay.subtract(const Duration(days: 1));
+      if (previousDay.isBefore(firstDay) ||
+          !_repeatMatches(previousDay, firstDay)) {
+        return false;
+      }
+      final previousStart = DateTime(
+        previousDay.year,
+        previousDay.month,
+        previousDay.day,
+        start.hour,
+        start.minute,
+        start.second,
+      );
+      return previousStart.add(end.difference(start)).isAfter(occurrenceDay);
     }
     final dayStart = DateTime(day.year, day.month, day.day);
     final dayEnd = dayStart.add(const Duration(days: 1));
@@ -189,10 +252,15 @@ class CalendarEntry {
 
   DateTime occurrenceStart(DateTime day) {
     if (repeat == CalendarRepeat.none) return start;
+    final occurrenceDay = DateTime(day.year, day.month, day.day);
+    final firstDay = DateTime(start.year, start.month, start.day);
+    final selectedDay = _repeatMatches(occurrenceDay, firstDay)
+        ? occurrenceDay
+        : occurrenceDay.subtract(const Duration(days: 1));
     return DateTime(
-      day.year,
-      day.month,
-      day.day,
+      selectedDay.year,
+      selectedDay.month,
+      selectedDay.day,
       start.hour,
       start.minute,
       start.second,
@@ -213,6 +281,10 @@ class CalendarEntry {
     bool? enabled,
     String? spaceId,
     CalendarRepeat? repeat,
+    int? repeatInterval,
+    Set<int>? repeatWeekdays,
+    DateTime? repeatUntil,
+    bool clearRepeatUntil = false,
     int? colorValue,
     bool clearColor = false,
   }) => CalendarEntry(
@@ -225,6 +297,9 @@ class CalendarEntry {
     enabled: enabled ?? this.enabled,
     spaceId: spaceId ?? this.spaceId,
     repeat: repeat ?? this.repeat,
+    repeatInterval: repeatInterval ?? this.repeatInterval,
+    repeatWeekdays: repeatWeekdays ?? this.repeatWeekdays,
+    repeatUntil: clearRepeatUntil ? null : repeatUntil ?? this.repeatUntil,
     colorValue: clearColor ? null : colorValue ?? this.colorValue,
   );
 
@@ -238,6 +313,9 @@ class CalendarEntry {
     'enabled': enabled,
     'spaceId': spaceId,
     'repeat': repeat.name,
+    'repeatInterval': repeatInterval,
+    'repeatWeekdays': repeatWeekdays.toList()..sort(),
+    'repeatUntil': repeatUntil?.toIso8601String(),
     'colorValue': colorValue,
   };
 
@@ -254,8 +332,47 @@ class CalendarEntry {
     enabled: json['enabled'] as bool? ?? true,
     spaceId: json['spaceId'] as String? ?? LifeSpace.personalId,
     repeat: CalendarRepeat.parse(json['repeat'] as String?),
+    repeatInterval: math.max(1, (json['repeatInterval'] as num?)?.toInt() ?? 1),
+    repeatWeekdays:
+        (json['repeatWeekdays'] as List<Object?>? ?? const <Object?>[])
+            .whereType<num>()
+            .map((value) => value.toInt())
+            .where(
+              (value) => value >= DateTime.monday && value <= DateTime.sunday,
+            )
+            .toSet(),
+    repeatUntil: _date(json['repeatUntil']),
     colorValue: (json['colorValue'] as num?)?.toInt(),
   );
+
+  bool _repeatMatches(DateTime day, DateTime firstDay) {
+    if (day.isBefore(firstDay)) return false;
+    final until = repeatUntil == null
+        ? null
+        : DateTime(repeatUntil!.year, repeatUntil!.month, repeatUntil!.day);
+    if (until != null && day.isAfter(until)) return false;
+    final interval = math.max(1, repeatInterval);
+    final daysApart = day.difference(firstDay).inDays;
+    return switch (repeat) {
+      CalendarRepeat.none => false,
+      CalendarRepeat.daily => daysApart % interval == 0,
+      CalendarRepeat.weekdays => day.weekday <= DateTime.friday,
+      CalendarRepeat.weekly =>
+        (daysApart ~/ 7) % interval == 0 &&
+            (repeatWeekdays.isEmpty
+                ? day.weekday == firstDay.weekday
+                : repeatWeekdays.contains(day.weekday)),
+      CalendarRepeat.monthly =>
+        day.day == firstDay.day &&
+            ((day.year - firstDay.year) * 12 + day.month - firstDay.month) %
+                    interval ==
+                0,
+      CalendarRepeat.yearly =>
+        day.month == firstDay.month &&
+            day.day == firstDay.day &&
+            (day.year - firstDay.year) % interval == 0,
+    };
+  }
 }
 
 enum SpaceRole {
@@ -335,7 +452,7 @@ class LifeData {
   final bool showBlockedTimes;
 
   Map<String, Object?> toJson() => {
-    'version': 1,
+    'version': 2,
     'activeSpaceId': activeSpaceId,
     'showBlockedTimes': showBlockedTimes,
     'tasks': tasks.map((task) => task.toJson()).toList(),

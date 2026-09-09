@@ -50,7 +50,9 @@ class LifeStore extends ChangeNotifier {
                 entry.occursOn(day),
           )
           .toList(growable: false)
-        ..sort((a, b) => a.start.compareTo(b.start));
+        ..sort(
+          (a, b) => a.occurrenceStart(day).compareTo(b.occurrenceStart(day)),
+        );
 
   Future<void> addTask({
     required String title,
@@ -107,6 +109,61 @@ class LifeStore extends ChangeNotifier {
     await _replaceTask(task.copyWith(completedDates: dates));
   }
 
+  Future<void> completeTaskForDate(
+    LifeTask task,
+    DateTime date, {
+    String note = '',
+  }) async {
+    final day = DateTime(date.year, date.month, date.day);
+    final notes = task.completionNotes
+        .where(
+          (item) =>
+              item.day.year != day.year ||
+              item.day.month != day.month ||
+              item.day.day != day.day,
+        )
+        .toList();
+    if (note.trim().isNotEmpty) {
+      notes.add(
+        TaskCompletionNote(day: day, recordedAt: _clock(), text: note.trim()),
+      );
+    }
+    if (task.repeat == TaskRepeat.none) {
+      await _replaceTask(
+        task.copyWith(completedAt: _clock(), completionNotes: notes),
+      );
+      return;
+    }
+    final dates = task.isDoneOn(day)
+        ? task.completedDates
+        : [...task.completedDates, day];
+    await _replaceTask(
+      task.copyWith(completedDates: dates, completionNotes: notes),
+    );
+  }
+
+  Future<void> updateTaskCompletionNote(
+    LifeTask task,
+    DateTime date,
+    String note,
+  ) async {
+    final day = DateTime(date.year, date.month, date.day);
+    final notes = task.completionNotes
+        .where(
+          (item) =>
+              item.day.year != day.year ||
+              item.day.month != day.month ||
+              item.day.day != day.day,
+        )
+        .toList();
+    if (note.trim().isNotEmpty) {
+      notes.add(
+        TaskCompletionNote(day: day, recordedAt: _clock(), text: note.trim()),
+      );
+    }
+    await _replaceTask(task.copyWith(completionNotes: notes));
+  }
+
   Future<void> updateTask(LifeTask task) => _replaceTask(task);
 
   Future<void> deleteTask(LifeTask task) async {
@@ -140,6 +197,9 @@ class LifeStore extends ChangeNotifier {
     required CalendarEntryKind kind,
     String location = '',
     CalendarRepeat repeat = CalendarRepeat.none,
+    int repeatInterval = 1,
+    Set<int> repeatWeekdays = const <int>{},
+    DateTime? repeatUntil,
     int? colorValue,
   }) async {
     final entry = CalendarEntry(
@@ -151,6 +211,9 @@ class LifeStore extends ChangeNotifier {
       location: location.trim(),
       spaceId: activeSpaceId,
       repeat: repeat,
+      repeatInterval: repeatInterval,
+      repeatWeekdays: repeatWeekdays,
+      repeatUntil: repeatUntil,
       colorValue: colorValue,
     );
     _data = LifeData(
@@ -178,10 +241,15 @@ class LifeStore extends ChangeNotifier {
 
   Future<int> importBlockedSchedule(String text) async {
     final imported = <CalendarEntry>[];
+    final signatures = _data.calendar
+        .where((entry) => entry.spaceId == activeSpaceId)
+        .map(_calendarSignature)
+        .toSet();
     for (final rawLine in text.split(RegExp(r'[\r\n]+'))) {
       final line = rawLine.trim();
       if (line.isEmpty) continue;
-      final parts = line.contains('\t') ? line.split('\t') : line.split(',');
+      final advanced = line.contains('\t');
+      final parts = advanced ? line.split('\t') : line.split(',');
       if (parts.length < 4) continue;
       final date = _parseDate(parts[0].trim());
       final startTime = _parseTime(parts[1].trim());
@@ -202,16 +270,26 @@ class LifeStore extends ChangeNotifier {
         endTime.$2,
       );
       if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
-      imported.add(
-        CalendarEntry(
-          id: '${_id('calendar', _clock())}-${imported.length}',
-          title: parts.sublist(3).join(',').trim(),
-          start: start,
-          end: end,
-          kind: CalendarEntryKind.blockedTime,
-          spaceId: activeSpaceId,
-        ),
+      final entry = CalendarEntry(
+        id: '${_id('calendar', _clock())}-${imported.length}',
+        title: advanced ? parts[3].trim() : parts.sublist(3).join(',').trim(),
+        start: start,
+        end: end,
+        kind: advanced && parts.length > 7
+            ? _parseCalendarKind(parts[7])
+            : CalendarEntryKind.blockedTime,
+        location: advanced && parts.length > 4 ? parts[4].trim() : '',
+        spaceId: activeSpaceId,
+        repeat: advanced && parts.length > 6
+            ? CalendarRepeat.parse(parts[6].trim().toLowerCase())
+            : CalendarRepeat.none,
+        colorValue: advanced && parts.length > 5
+            ? _parseCalendarColor(parts[5])
+            : null,
       );
+      final signature = _calendarSignature(entry);
+      if (!signatures.add(signature)) continue;
+      imported.add(entry);
     }
     if (imported.isEmpty) return 0;
     _data = LifeData(
@@ -223,6 +301,43 @@ class LifeStore extends ChangeNotifier {
     );
     await _save();
     return imported.length;
+  }
+
+  String _calendarSignature(CalendarEntry entry) => [
+    entry.spaceId,
+    entry.title.trim().toLowerCase(),
+    entry.start.toIso8601String(),
+    entry.end.toIso8601String(),
+    entry.kind.name,
+    entry.repeat.name,
+  ].join('|');
+
+  CalendarEntryKind _parseCalendarKind(String value) =>
+      value.trim().toLowerCase() == 'event'
+      ? CalendarEntryKind.event
+      : CalendarEntryKind.blockedTime;
+
+  int? _parseCalendarColor(String value) {
+    const named = <String, int>{
+      'green': 0xFF70C982,
+      'cyan': 0xFF45C7BA,
+      'blue': 0xFF4FA3E3,
+      'red': 0xFFE05D62,
+      'yellow': 0xFFF1C94A,
+      'coral': 0xFFD16A61,
+      'gray': 0xFF89909B,
+      'grey': 0xFF89909B,
+      'purple': 0xFF9B66D9,
+    };
+    final normalized = value.trim().toLowerCase();
+    if (normalized.isEmpty) return null;
+    final preset = named[normalized];
+    if (preset != null) return preset;
+    final hex = normalized.replaceFirst('#', '').replaceFirst('0x', '');
+    if (!RegExp(r'^[0-9a-f]{6}([0-9a-f]{2})?$').hasMatch(hex)) return null;
+    final parsed = int.tryParse(hex, radix: 16);
+    if (parsed == null) return null;
+    return hex.length == 6 ? 0xFF000000 | parsed : parsed;
   }
 
   Future<void> deleteCalendarEntry(CalendarEntry entry) async {

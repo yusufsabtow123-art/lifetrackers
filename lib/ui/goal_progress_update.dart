@@ -9,18 +9,20 @@ class GoalProgressUpdate extends StatelessWidget {
     super.key,
     required this.goal,
     required this.store,
+    this.label = 'Log amount',
   });
 
   final Goal goal;
   final GoalStore store;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     return FilledButton.tonalIcon(
       key: const Key('log-amount-progress-button'),
       onPressed: () => _showAmountDialog(context),
-      icon: const Icon(Icons.add_chart_rounded),
-      label: const Text('Log amount'),
+      icon: const Icon(Icons.bar_chart_outlined, size: 18),
+      label: Text(label),
     );
   }
 
