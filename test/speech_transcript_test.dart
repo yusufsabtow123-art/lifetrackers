@@ -26,4 +26,14 @@ void main() {
 
     expect(transcript.text, 'Take the trash out');
   });
+
+  test('recognizer restarts do not repeat overlapping committed words', () {
+    final transcript = SpeechTranscriptAccumulator();
+
+    transcript.update('I memorized two pages', isFinal: true);
+    transcript.update('two pages and reviewed yesterday', isFinal: true);
+    transcript.update('two pages and reviewed yesterday', isFinal: true);
+
+    expect(transcript.text, 'I memorized two pages and reviewed yesterday');
+  });
 }

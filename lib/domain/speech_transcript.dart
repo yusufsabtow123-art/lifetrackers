@@ -32,5 +32,26 @@ String joinSpeechSegments(String before, String spoken) {
   final right = spoken.trim();
   if (left.isEmpty) return right;
   if (right.isEmpty) return left;
+  if (_normalized(left) == _normalized(right) ||
+      _normalized(left).endsWith(_normalized(right))) {
+    return left;
+  }
+
+  final leftWords = left.split(RegExp(r'\s+'));
+  final rightWords = right.split(RegExp(r'\s+'));
+  final possibleOverlap = leftWords.length < rightWords.length
+      ? leftWords.length
+      : rightWords.length;
+  for (var overlap = possibleOverlap; overlap >= 2; overlap -= 1) {
+    final leftTail = leftWords.sublist(leftWords.length - overlap);
+    final rightHead = rightWords.sublist(0, overlap);
+    if (_normalized(leftTail.join(' ')) == _normalized(rightHead.join(' '))) {
+      final remainder = rightWords.sublist(overlap).join(' ');
+      return remainder.isEmpty ? left : '$left $remainder';
+    }
+  }
   return '$left $right';
 }
+
+String _normalized(String value) =>
+    value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();

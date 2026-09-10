@@ -21,9 +21,14 @@ class MainActivity : FlutterActivity() {
     private var pendingFileResult: MethodChannel.Result? = null
     private var pendingAttachmentResult: MethodChannel.Result? = null
     private var pendingLocationResult: MethodChannel.Result? = null
+    private var speechBridge: ContinuousSpeechBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        speechBridge = ContinuousSpeechBridge(
+            this,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "life_tracker/files"
@@ -103,6 +108,12 @@ class MainActivity : FlutterActivity() {
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == ContinuousSpeechBridge.permissionRequest) {
+            speechBridge?.onPermissionResult(
+                grantResults.any { it == PackageManager.PERMISSION_GRANTED },
+            )
+            return
+        }
         if (requestCode != locationPermissionRequest) return
         if (grantResults.any { it == PackageManager.PERMISSION_GRANTED }) {
             readCurrentLocation()
@@ -255,6 +266,12 @@ class MainActivity : FlutterActivity() {
             startActivity(Intent.createChooser(intent, "Open attachment"))
         }.onSuccess { result.success(true) }
             .onFailure { result.error("open_failed", it.message, null) }
+    }
+
+    override fun onDestroy() {
+        speechBridge?.dispose()
+        speechBridge = null
+        super.onDestroy()
     }
 
     companion object {
