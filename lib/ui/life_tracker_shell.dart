@@ -13,7 +13,6 @@ import '../domain/plan_calculator.dart';
 import '../platform/goal_notification_service.dart';
 import '../platform/attachment_picker.dart';
 import 'app_theme.dart';
-import 'goal_details_sheet.dart';
 import 'life_calendar_page.dart';
 import 'life_goals_page.dart';
 import 'life_icons.dart';
@@ -489,13 +488,11 @@ class TodayPage extends StatelessWidget {
             subtitle:
                 '${formatAmount(action.amount)} ${action.goal.plan!.unit}',
             done: false,
-            onTap: () => showGoalDetailsSheet(
+            onTap: () => showGoalActionCompletionRecord(
               context,
               goalStore,
-              action.goal.id,
-              showAbandoned: settings.showAbandoned,
-              progressFormat: settings.progressFormat,
-              settings: settings,
+              action.goal,
+              today,
             ),
             onToggle: () async {
               await goalStore.completeTodayAction(action.goal.id);
@@ -581,6 +578,12 @@ class TodayPage extends StatelessWidget {
                       '${formatAmount(goal.completionFor(today)!.amount)} ${goal.plan?.unit ?? ''}',
                   done: true,
                   onToggle: () => goalStore.undoTodayAction(goal.id),
+                  onDetails: () => showGoalActionCompletionRecord(
+                    context,
+                    goalStore,
+                    goal,
+                    today,
+                  ),
                 ),
               for (final task in completedTasks)
                 _TaskTile(
@@ -2939,6 +2942,18 @@ Future<bool?> showTaskCompletionRecord(
 ) => Navigator.of(context).push<bool>(
   MaterialPageRoute(
     builder: (_) => TaskCompletionPage(store: store, task: task, day: day),
+  ),
+);
+
+Future<bool?> showGoalActionCompletionRecord(
+  BuildContext context,
+  GoalStore store,
+  Goal goal,
+  DateTime day,
+) => Navigator.of(context).push<bool>(
+  MaterialPageRoute(
+    builder: (_) =>
+        TaskCompletionPage.forGoal(goalStore: store, goal: goal, day: day),
   ),
 );
 

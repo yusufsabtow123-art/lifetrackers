@@ -1,3 +1,5 @@
+import 'life_data.dart';
+
 enum GoalStatus {
   ideas('Ideas', 'Captured outcomes that are not planned yet.'),
   planned(
@@ -176,12 +178,27 @@ class DailyActionCompletion {
     required this.completedAt,
     required this.amount,
     this.note = '',
+    this.record,
   });
 
   final DateTime actionDate;
   final DateTime completedAt;
   final double amount;
   final String note;
+  final TaskCompletionNote? record;
+
+  DailyActionCompletion copyWith({
+    DateTime? completedAt,
+    double? amount,
+    String? note,
+    TaskCompletionNote? record,
+  }) => DailyActionCompletion(
+    actionDate: actionDate,
+    completedAt: completedAt ?? this.completedAt,
+    amount: amount ?? this.amount,
+    note: note ?? this.note,
+    record: record ?? this.record,
+  );
 }
 
 class GoalStep {

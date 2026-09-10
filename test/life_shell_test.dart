@@ -72,6 +72,52 @@ void main() {
     expect(find.byKey(const ValueKey('complete')), findsOneWidget);
   });
 
+  testWidgets('Today goal arrow opens the approved completion record', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final today = DateTime(2026, 9, 10, 18, 7);
+    final goals = GoalStore(
+      repository: MemoryGoalRepository(),
+      clock: () => today,
+    );
+    await goals.load();
+    await goals.createPlanned(
+      name: 'Memorize the Quran',
+      amount: 10,
+      unit: 'pages',
+      startDate: today,
+      deadline: DateTime(2026, 9, 19),
+      wholeUnits: true,
+    );
+    final lifeStore = LifeStore(MemoryLifeRepository(), clock: () => today);
+    await lifeStore.load();
+
+    await tester.pumpWidget(GoalApp(store: goals, lifeStore: lifeStore));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Completion record'), findsOneWidget);
+    expect(find.text('Progress & plan'), findsNothing);
+    expect(find.text('Save completion'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Complete'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Completed'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Completion details'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Completion record'), findsOneWidget);
+    expect(find.text('Outcome'), findsOneWidget);
+    expect(find.text('Notes'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('editing an undated task preserves its unscheduled state', (
     tester,
   ) async {

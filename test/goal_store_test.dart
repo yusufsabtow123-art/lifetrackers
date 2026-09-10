@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:goal_tracker_poc/app/goal_store.dart';
 import 'package:goal_tracker_poc/data/goal_repository.dart';
 import 'package:goal_tracker_poc/domain/goal.dart';
+import 'package:goal_tracker_poc/domain/life_data.dart';
 
 void main() {
   test(
@@ -119,6 +120,40 @@ void main() {
     await store.undoLastChange();
     saved = (await repository.loadAll()).single;
     expect(saved.dailyActionCompletions.single.note, 'Read the introduction.');
+  });
+
+  test('today goal action saves the full completion record', () async {
+    final today = DateTime(2026, 9, 10, 18, 7);
+    final repository = MemoryGoalRepository();
+    final store = GoalStore(repository: repository, clock: () => today);
+    await store.load();
+    final goal = await store.createPlanned(
+      name: 'Memorize the Quran',
+      amount: 10,
+      unit: 'pages',
+      startDate: today,
+      deadline: DateTime(2026, 9, 19),
+      wholeUnits: true,
+    );
+
+    await store.completeTodayAction(goal.id);
+    final initial = store.goalById(goal.id)!.completionFor(today)!.record!;
+    await store.saveTodayActionCompletionRecord(
+      goal.id,
+      initial.copyWith(
+        text: 'Memorized two pages and reviewed yesterday’s page.',
+        locationName: 'Masjid Dawah',
+        locationAddress: '605 Fairview Ave N, Saint Paul, MN',
+        effort: TaskCompletionEffort.hard,
+        people: const [CompletionPerson(id: 'ahmed', name: 'Ahmed')],
+      ),
+    );
+
+    final saved = (await repository.loadAll()).single.completionFor(today)!;
+    expect(saved.note, 'Memorized two pages and reviewed yesterday’s page.');
+    expect(saved.record!.locationName, 'Masjid Dawah');
+    expect(saved.record!.people.single.name, 'Ahmed');
+    expect(saved.record!.effort, TaskCompletionEffort.hard);
   });
 
   test(

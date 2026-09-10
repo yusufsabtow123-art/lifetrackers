@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/goal_repository.dart';
 import '../domain/goal.dart';
+import '../domain/life_data.dart';
 import '../domain/plan_calculator.dart';
 
 typedef LocalFolderOpener = Future<bool> Function(String path);
@@ -640,11 +641,68 @@ class GoalStore extends ChangeNotifier {
             completedAt: now,
             amount: actualChange,
             note: note.trim(),
+            record: TaskCompletionNote(
+              day: DateTime(today.year, today.month, today.day),
+              recordedAt: now,
+              text: note.trim(),
+              actualEndAt: now,
+              scheduledStartAt: goal.reminder == null
+                  ? null
+                  : DateTime(
+                      today.year,
+                      today.month,
+                      today.day,
+                      goal.reminder!.hour,
+                      goal.reminder!.minute,
+                    ),
+              scheduledEndAt: goal.reminder == null
+                  ? null
+                  : DateTime(
+                      today.year,
+                      today.month,
+                      today.day,
+                      goal.reminder!.hour,
+                      goal.reminder!.minute,
+                    ).add(const Duration(hours: 1)),
+            ),
           ),
         ],
         showStartNotice: false,
         updatedAt: now,
       ),
+    );
+  }
+
+  Future<void> saveTodayActionCompletionRecord(
+    String goalId,
+    TaskCompletionNote record,
+  ) async {
+    var goal = _find(goalId);
+    if (goal == null || goal.plan == null) return;
+    var completion = goal.completionFor(record.day);
+    if (completion == null) {
+      final isToday =
+          record.day.year == today.year &&
+          record.day.month == today.month &&
+          record.day.day == today.day;
+      if (!isToday) return;
+      await completeTodayAction(goalId, note: record.text);
+      goal = _find(goalId);
+      completion = goal?.completionFor(record.day);
+    }
+    if (goal == null || completion == null) return;
+    final completions = List<DailyActionCompletion>.of(
+      goal.dailyActionCompletions,
+    );
+    final index = completions.indexOf(completion);
+    if (index < 0) return;
+    completions[index] = completion.copyWith(
+      completedAt: record.actualEndAt ?? record.recordedAt,
+      note: record.text.trim(),
+      record: record,
+    );
+    await _replace(
+      goal.copyWith(dailyActionCompletions: completions, updatedAt: _clock()),
     );
   }
 

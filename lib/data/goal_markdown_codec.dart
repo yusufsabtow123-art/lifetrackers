@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../domain/goal.dart';
+import '../domain/life_data.dart';
 import '../domain/plan_calculator.dart';
 
 class GoalMarkdownCodec {
@@ -66,6 +67,8 @@ class GoalMarkdownCodec {
               'completed_at': completion.completedAt.toIso8601String(),
               'amount': completion.amount,
               'note': completion.note,
+              if (completion.record != null)
+                'record': completion.record!.toJson(),
             },
           )
           .toList(),
@@ -276,6 +279,11 @@ class GoalMarkdownCodec {
                 completedAt: DateTime.parse(entry['completed_at']! as String),
                 amount: _doubleOrNull(entry['amount']) ?? 0,
                 note: entry['note'] as String? ?? '',
+                record: entry['record'] is Map
+                    ? TaskCompletionNote.fromJson(
+                        Map<String, Object?>.from(entry['record']! as Map),
+                      )
+                    : null,
               ),
             )
             .toList();

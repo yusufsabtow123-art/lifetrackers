@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/goal_store.dart';
 import '../app/life_store.dart';
+import '../domain/goal.dart';
 import '../domain/life_data.dart';
 import '../platform/attachment_picker.dart';
 import '../platform/external_link_service.dart';
@@ -16,10 +18,21 @@ class TaskCompletionPage extends StatefulWidget {
     required this.store,
     required this.task,
     required this.day,
-  });
+  }) : goalStore = null,
+       goal = null;
 
-  final LifeStore store;
-  final LifeTask task;
+  const TaskCompletionPage.forGoal({
+    super.key,
+    required this.goalStore,
+    required this.goal,
+    required this.day,
+  }) : store = null,
+       task = null;
+
+  final LifeStore? store;
+  final LifeTask? task;
+  final GoalStore? goalStore;
+  final Goal? goal;
   final DateTime day;
 
   @override
@@ -36,9 +49,13 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
   @override
   void initState() {
     super.initState();
-    final existing = widget.task.completionNoteFor(widget.day);
-    final completedAt = widget.task.repeat == TaskRepeat.none
-        ? widget.task.completedAt
+    final goalCompletion = widget.goal?.completionFor(widget.day);
+    final existing =
+        widget.task?.completionNoteFor(widget.day) ?? goalCompletion?.record;
+    final completedAt = widget.task == null
+        ? goalCompletion?.completedAt
+        : widget.task!.repeat == TaskRepeat.none
+        ? widget.task!.completedAt
         : null;
     final completionTime =
         existing?.actualEndAt ??
@@ -51,11 +68,11 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
         TaskCompletionNote(
           day: DateTime(widget.day.year, widget.day.month, widget.day.day),
           recordedAt: completionTime,
-          text: '',
+          text: goalCompletion?.note ?? '',
           actualEndAt: completionTime,
           scheduledStartAt: scheduledStart,
           scheduledEndAt: scheduledStart?.add(const Duration(hours: 1)),
-          locationName: widget.task.location,
+          locationName: widget.task?.location ?? '',
         );
     _notes = TextEditingController(text: _record.text);
     _attachments = _record.attachments.toList();
@@ -63,16 +80,19 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
   }
 
   DateTime? _scheduledOnDay() {
-    final due = widget.task.dueAt;
-    if (due == null) return null;
+    final due = widget.task?.dueAt;
+    final reminder = widget.goal?.reminder;
+    if (due == null && reminder == null) return null;
     return DateTime(
       widget.day.year,
       widget.day.month,
       widget.day.day,
-      due.hour,
-      due.minute,
+      due?.hour ?? reminder!.hour,
+      due?.minute ?? reminder!.minute,
     );
   }
+
+  String get _title => widget.task?.title ?? widget.goal!.name;
 
   @override
   void dispose() {
@@ -196,7 +216,7 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          widget.task.title,
+          _title,
           style: const TextStyle(
             fontSize: 25,
             height: 1.15,
@@ -236,7 +256,14 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
       attachments: _attachments,
       people: _people,
     );
-    await widget.store.saveTaskCompletionRecord(widget.task, updated);
+    if (widget.task != null) {
+      await widget.store!.saveTaskCompletionRecord(widget.task!, updated);
+    } else {
+      await widget.goalStore!.saveTodayActionCompletionRecord(
+        widget.goal!.id,
+        updated,
+      );
+    }
     if (!mounted) return;
     HapticFeedback.lightImpact();
     Navigator.pop(context, true);
@@ -244,7 +271,7 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
 
   Future<void> _copySummary() async {
     final text =
-        '${widget.task.title}\n${_record.outcome.label} · '
+        '$_title\n${_record.outcome.label} · '
         '${_longDateTime(_record.actualEndAt ?? _record.recordedAt)}\n'
         '${_notes.text.trim()}';
     await Clipboard.setData(ClipboardData(text: text.trim()));

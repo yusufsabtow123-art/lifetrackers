@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:goal_tracker_poc/data/goal_markdown_codec.dart';
 import 'package:goal_tracker_poc/data/goal_repository.dart';
 import 'package:goal_tracker_poc/domain/goal.dart';
+import 'package:goal_tracker_poc/domain/life_data.dart';
 
 void main() {
   test('Markdown remains readable and round-trips all board data', () {
@@ -49,6 +50,13 @@ void main() {
           completedAt: DateTime.utc(2026, 8, 2, 9),
           amount: 20,
           note: 'Reviewed the first section.',
+          record: TaskCompletionNote(
+            day: DateTime.utc(2026, 8, 2),
+            recordedAt: DateTime.utc(2026, 8, 2, 9),
+            text: 'Reviewed the first section.',
+            locationName: 'Masjid Dawah',
+            people: const [CompletionPerson(id: 'ahmed', name: 'Ahmed')],
+          ),
         ),
       ],
       steps: [
@@ -88,6 +96,14 @@ void main() {
     expect(markdown, contains('Got tomatoes (edited)'));
     expect(markdown, contains('"step_id":"make-sauce"'));
     final decoded = codec.decode(markdown);
+    expect(
+      decoded.dailyActionCompletions.single.record!.locationName,
+      'Masjid Dawah',
+    );
+    expect(
+      decoded.dailyActionCompletions.single.record!.people.single.name,
+      'Ahmed',
+    );
     expect(decoded.name, goal.name);
     expect(decoded.status, GoalStatus.active);
     final pausedMarkdown = codec.encode(
