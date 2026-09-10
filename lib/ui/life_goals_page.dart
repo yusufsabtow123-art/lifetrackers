@@ -63,6 +63,7 @@ class _LifeGoalsPageState extends State<LifeGoalsPage> {
   @override
   Widget build(BuildContext context) {
     final mobile = MediaQuery.sizeOf(context).width < 820;
+    final compactSimplified = mobile && _simplified;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         mobile ? 16 : 24,
@@ -73,42 +74,71 @@ class _LifeGoalsPageState extends State<LifeGoalsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Header(
-            mobile: mobile,
-            onNewGoal: () => showCreateGoalDialog(context, widget.store),
-          ),
-          const SizedBox(height: 14),
-          _Toolbar(
-            simplified: _simplified,
-            category: _category,
-            categories: widget.store.availableCategories,
-            onViewChanged: (value) => setState(() => _simplified = value),
-            onCategoryChanged: (value) => setState(() => _category = value),
-          ),
-          const SizedBox(height: 10),
-          Divider(color: context.appBorder),
-          const SizedBox(height: 12),
+          if (compactSimplified)
+            _SimplifiedHeader(
+              onViewChanged: (value) => setState(() => _simplified = value),
+            )
+          else ...[
+            _Header(
+              mobile: mobile,
+              onNewGoal: () => showCreateGoalDialog(context, widget.store),
+            ),
+            const SizedBox(height: 14),
+            _Toolbar(
+              simplified: _simplified,
+              category: _category,
+              categories: widget.store.availableCategories,
+              onViewChanged: (value) => setState(() {
+                _simplified = value;
+                if (value) _category = null;
+              }),
+              onCategoryChanged: (value) => setState(() => _category = value),
+            ),
+            const SizedBox(height: 10),
+            Divider(color: context.appBorder),
+          ],
+          SizedBox(height: compactSimplified ? 24 : 12),
           Expanded(
-            child: _goals.isEmpty
-                ? _EmptyGoals(
-                    onCreate: () => showCreateGoalDialog(context, widget.store),
-                  )
-                : _simplified
-                ? _SimplifiedGoals(
-                    goals: _goals,
-                    store: widget.store,
-                    onOpen: _open,
-                    onOptions: _showOptions,
-                  )
-                : _Board(
-                    mobile: mobile,
-                    goals: _goals,
-                    columns: _columns,
-                    onOpen: _open,
-                    onMove: (goal, status) =>
-                        widget.store.moveGoal(goal.id, status),
-                    onOptions: _showOptions,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _goals.isEmpty
+                      ? _EmptyGoals(
+                          onCreate: () =>
+                              showCreateGoalDialog(context, widget.store),
+                        )
+                      : _simplified
+                      ? _SimplifiedGoals(
+                          goals: _goals,
+                          onOpen: _open,
+                          onOptions: _showOptions,
+                        )
+                      : _Board(
+                          mobile: mobile,
+                          goals: _goals,
+                          columns: _columns,
+                          onOpen: _open,
+                          onMove: (goal, status) =>
+                              widget.store.moveGoal(goal.id, status),
+                          onOptions: _showOptions,
+                        ),
+                ),
+                if (compactSimplified)
+                  Positioned(
+                    right: 2,
+                    bottom: 14,
+                    child: FloatingActionButton(
+                      key: const Key('simplified-new-goal-button'),
+                      tooltip: 'New goal',
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      onPressed: () =>
+                          showCreateGoalDialog(context, widget.store),
+                      child: const Icon(Icons.add_rounded, size: 31),
+                    ),
                   ),
+              ],
+            ),
           ),
         ],
       ),
@@ -223,6 +253,100 @@ class _LifeGoalsPageState extends State<LifeGoalsPage> {
       ),
     );
   }
+}
+
+class _SimplifiedHeader extends StatelessWidget {
+  const _SimplifiedHeader({required this.onViewChanged});
+
+  final ValueChanged<bool> onViewChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: Text('Goals', style: Theme.of(context).textTheme.displaySmall),
+          ),
+          _SimplifiedViewSwitcher(onViewChanged: onViewChanged),
+        ],
+      ),
+      const SizedBox(height: 4),
+      Text(
+        'Move what matters forward.',
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: context.appMuted),
+      ),
+    ],
+  );
+}
+
+class _SimplifiedViewSwitcher extends StatelessWidget {
+  const _SimplifiedViewSwitcher({required this.onViewChanged});
+
+  final ValueChanged<bool> onViewChanged;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 44,
+    padding: const EdgeInsets.all(2),
+    decoration: BoxDecoration(
+      border: Border.all(color: context.appBorder),
+      borderRadius: BorderRadius.circular(15),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _SimplifiedViewChoice(
+          label: 'Board',
+          selected: false,
+          onTap: () => onViewChanged(false),
+        ),
+        _SimplifiedViewChoice(
+          label: 'Simplified',
+          selected: true,
+          onTap: () => onViewChanged(true),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SimplifiedViewChoice extends StatelessWidget {
+  const _SimplifiedViewChoice({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: selected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+    borderRadius: BorderRadius.circular(13),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected
+                ? Theme.of(context).colorScheme.onPrimary
+                : context.appMuted,
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _Header extends StatelessWidget {
@@ -789,152 +913,160 @@ class _GoalCard extends StatelessWidget {
 class _SimplifiedGoals extends StatelessWidget {
   const _SimplifiedGoals({
     required this.goals,
-    required this.store,
     required this.onOpen,
     required this.onOptions,
   });
 
   final List<Goal> goals;
-  final GoalStore store;
   final ValueChanged<Goal> onOpen;
   final ValueChanged<Goal> onOptions;
 
+  static const _groups = <_SimplifiedGoalGroup>[
+    _SimplifiedGoalGroup(
+      label: 'Ideas',
+      statuses: {GoalStatus.ideas, GoalStatus.planned},
+    ),
+    _SimplifiedGoalGroup(
+      label: 'In progress',
+      statuses: {GoalStatus.active},
+    ),
+    _SimplifiedGoalGroup(
+      label: 'Paused',
+      statuses: {GoalStatus.paused},
+    ),
+    _SimplifiedGoalGroup(
+      label: 'Finished',
+      statuses: {GoalStatus.completed},
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final sorted = [
-      ...goals,
-    ]..sort((a, b) => _statusOrder(a.status).compareTo(_statusOrder(b.status)));
-    return ListView.separated(
+    return ListView(
       key: const Key('simplified-goal-list'),
-      padding: const EdgeInsets.only(bottom: 12),
-      itemCount: sorted.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 7),
-      itemBuilder: (context, index) {
-        final goal = sorted[index];
-        return _SimpleGoalRow(
-          key: Key('simplified-goal-${goal.id}'),
-          goal: goal,
-          store: store,
-          onTap: () => onOpen(goal),
-          onOptions: () => onOptions(goal),
-        );
-      },
+      padding: const EdgeInsets.only(bottom: 92),
+      children: [
+        for (var groupIndex = 0; groupIndex < _groups.length; groupIndex++) ...[
+          if (groupIndex > 0) const SizedBox(height: 25),
+          _SimplifiedSectionHeader(
+            group: _groups[groupIndex],
+            count: goals
+                .where((goal) => _groups[groupIndex].statuses.contains(goal.status))
+                .length,
+          ),
+          for (final goal in goals.where(
+            (goal) => _groups[groupIndex].statuses.contains(goal.status),
+          ))
+            _SimpleGoalRow(
+              key: Key('simplified-goal-${goal.id}'),
+              goal: goal,
+              onTap: () => onOpen(goal),
+              onOptions: () => onOptions(goal),
+            ),
+        ],
+      ],
     );
   }
+}
+
+class _SimplifiedGoalGroup {
+  const _SimplifiedGoalGroup({required this.label, required this.statuses});
+
+  final String label;
+  final Set<GoalStatus> statuses;
+}
+
+class _SimplifiedSectionHeader extends StatelessWidget {
+  const _SimplifiedSectionHeader({required this.group, required this.count});
+
+  final _SimplifiedGoalGroup group;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Row(
+      children: [
+        Text(
+          group.label,
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(width: 12),
+        Text('$count', style: TextStyle(color: context.appMuted, fontSize: 13)),
+        const SizedBox(width: 15),
+        Expanded(child: Divider(color: context.appBorder.withValues(alpha: .8))),
+      ],
+    ),
+  );
 }
 
 class _SimpleGoalRow extends StatelessWidget {
   const _SimpleGoalRow({
     super.key,
     required this.goal,
-    required this.store,
     required this.onTap,
     required this.onOptions,
   });
 
   final Goal goal;
-  final GoalStore store;
   final VoidCallback onTap;
   final VoidCallback onOptions;
 
   @override
   Widget build(BuildContext context) {
-    final action = store.calculator.actionForDate(goal, store.today);
-    final nextStep = _nextStep(goal);
-    final progress = goal.plan == null
-        ? '${goal.completedStepCount} of ${goal.steps.length} steps'
-        : '${_number(goal.completedAmount)} of ${_number(goal.plan!.totalAmount)} ${goal.plan!.unit}';
-    final next = action > 0
-        ? 'Today: ${_number(action)} ${goal.plan!.unit}'
-        : nextStep == null
-        ? (goal.plan == null ? 'Add a plan' : 'No action due today')
-        : 'Next: $nextStep';
+    final percentage = goal.status == GoalStatus.completed
+        ? 100
+        : (goal.progress * 100).round();
     return Material(
-      color: context.appPanel,
-      borderRadius: BorderRadius.circular(9),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(9),
+        onLongPress: onOptions,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          height: 56,
           decoration: BoxDecoration(
-            border: Border.all(color: context.appBorder.withValues(alpha: .8)),
-            borderRadius: BorderRadius.circular(9),
+            border: Border(
+              bottom: BorderSide(
+                color: context.appBorder.withValues(alpha: .32),
+              ),
+            ),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 5),
+              Semantics(
+                label: '${goal.name}, $percentage percent complete',
                 child: Container(
-                  width: 10,
-                  height: 10,
+                  width: 27,
+                  height: 27,
                   decoration: BoxDecoration(
-                    color: _categoryColor(goal.category),
                     shape: BoxShape.circle,
+                    border: Border.all(color: context.appText, width: 1.7),
                   ),
                 ),
               ),
-              const SizedBox(width: 11),
+              const SizedBox(width: 20),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      goal.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      progress,
-                      style: TextStyle(fontSize: 11, color: context.appMuted),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      next,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                  ],
+                child: Text(
+                  goal.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w400),
                 ),
               ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    _simpleStatus(goal.status),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: context.appMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 11),
-                  Text(
-                    goal.plan == null
-                        ? 'No date'
-                        : _shortDate(goal.plan!.deadline),
-                    style: TextStyle(fontSize: 10, color: context.appMuted),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                tooltip: 'Goal options',
-                visualDensity: VisualDensity.compact,
-                onPressed: onOptions,
-                icon: Icon(
-                  Icons.more_horiz_rounded,
-                  size: 18,
-                  color: context.appMuted,
+              if (percentage > 0) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '$percentage%',
+                  style: TextStyle(fontSize: 13, color: context.appMuted),
                 ),
+              ],
+              const SizedBox(width: 13),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 23,
+                color: context.appText,
               ),
             ],
           ),
@@ -1000,14 +1132,6 @@ class _GoalColumn {
   final Color color;
 }
 
-Color _categoryColor(String category) => switch (category) {
-  'Faith' => const Color(0xFFD8B84E),
-  'Health' || 'Body' => const Color(0xFF62B98A),
-  'Mind' => const Color(0xFFD4D0C7),
-  'Finances' || 'Work' => const Color(0xFFC58E45),
-  _ => const Color(0xFF92959F),
-};
-
 String _number(double value) => value == value.roundToDouble()
     ? value.round().toString()
     : value.toStringAsFixed(1);
@@ -1028,27 +1152,4 @@ String _shortDate(DateTime date) {
     'Dec',
   ];
   return '${months[date.month - 1]} ${date.day}, ${date.year}';
-}
-
-int _statusOrder(GoalStatus status) => switch (status) {
-  GoalStatus.active => 0,
-  GoalStatus.planned || GoalStatus.ideas => 1,
-  GoalStatus.paused => 2,
-  GoalStatus.completed => 3,
-  GoalStatus.abandoned => 4,
-};
-
-String _simpleStatus(GoalStatus status) => switch (status) {
-  GoalStatus.active => 'In progress',
-  GoalStatus.planned || GoalStatus.ideas => 'To do',
-  GoalStatus.paused => 'Paused',
-  GoalStatus.completed => 'Completed',
-  GoalStatus.abandoned => 'Stopped',
-};
-
-String? _nextStep(Goal goal) {
-  for (final step in goal.steps) {
-    if (!step.isCompleted) return step.title;
-  }
-  return null;
 }

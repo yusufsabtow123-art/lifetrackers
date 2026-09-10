@@ -208,7 +208,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('simplified goals are one compact action list', (tester) async {
+  testWidgets('simplified goals match the grouped text-first design', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final goals = GoalStore(repository: MemoryGoalRepository());
@@ -226,7 +228,16 @@ void main() {
 
     expect(find.byKey(const Key('simplified-goal-list')), findsOneWidget);
     expect(find.text('Find a better job'), findsOneWidget);
-    expect(find.text('Add a plan'), findsWidgets);
+    expect(find.text('Ideas'), findsOneWidget);
+    expect(find.text('In progress'), findsOneWidget);
+    expect(find.text('Paused'), findsOneWidget);
+    expect(find.text('Finished'), findsOneWidget);
+    expect(
+      find.byKey(const Key('simplified-new-goal-button')),
+      findsOneWidget,
+    );
+    expect(find.text('Move what matters forward.'), findsOneWidget);
+    expect(find.text('Add a plan'), findsNothing);
     expect(find.byKey(const Key('mobile-goal-board')), findsNothing);
     expect(tester.takeException(), isNull);
   });
