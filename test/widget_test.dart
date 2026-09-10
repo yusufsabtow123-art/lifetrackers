@@ -819,6 +819,14 @@ void main() {
     await tester.tap(find.byKey(const Key('appearance-light')));
     await tester.pageBack();
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Calendar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('salah-calendar-enabled')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('ISNA · North America'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Board and categories'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('progress-format-both')));

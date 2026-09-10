@@ -125,9 +125,6 @@ class GoalNotificationService implements GoalNotificationAdapter {
       AndroidScheduleMode.inexactAllowWhileIdle;
   final GoalNotificationReconciler _reconciler =
       const GoalNotificationReconciler();
-  Set<int> _knownDesiredIds = const {};
-  bool _completedInitialSync = false;
-
   Stream<NotificationIntent> get intents => _intents.stream;
 
   NotificationIntent? takeInitialIntent() {
@@ -316,19 +313,10 @@ class GoalNotificationService implements GoalNotificationAdapter {
     final schedules = defaultTargetPlatform == TargetPlatform.windows
         ? expandWindowsNotificationSchedules(plannedSchedules)
         : plannedSchedules;
-    final desiredIds = schedules.map((item) => item.id).toSet();
     if (schedules.isNotEmpty) {
-      var allowed = (await notificationStatus()).allowed;
-      final newlyAdded = desiredIds.difference(_knownDesiredIds);
-      if (!allowed && _completedInitialSync && newlyAdded.isNotEmpty) {
-        allowed = await requestPermissions(force: true);
-      }
-      _knownDesiredIds = desiredIds;
-      _completedInitialSync = true;
-      if (!allowed) return;
-    } else {
-      _knownDesiredIds = desiredIds;
-      _completedInitialSync = true;
+      // Permission requests are user-driven from Settings. Background sync must
+      // never surprise a person with a system dialog during first launch.
+      if (!(await notificationStatus()).allowed) return;
     }
 
     await _reconciler.reconcile(adapter: this, desiredSchedules: schedules);

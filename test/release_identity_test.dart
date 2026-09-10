@@ -3,15 +3,12 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('v0.15.1 advances beyond every published preview build', () {
+  test('v0.16.0 uses the permanent collision-free Android identity', () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
 
-    expect(pubspec, contains('version: 0.15.1+2031'));
-    expect(
-      gradle,
-      contains('applicationId = "app.localfirst.goal_tracker_poc"'),
-    );
+    expect(pubspec, contains('version: 0.16.0+2040'));
+    expect(gradle, contains('applicationId = "app.lifetracker.personal"'));
   });
 
   test(

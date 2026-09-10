@@ -37,6 +37,7 @@ class GoalApp extends StatefulWidget {
 class _GoalAppState extends State<GoalApp> {
   late final AppSettingsController _settings;
   final _navigatorKey = GlobalKey<NavigatorState>();
+  final _lifeShellKey = GlobalKey<LifeTrackerShellState>();
   StreamSubscription<NotificationIntent>? _notificationSubscription;
   StreamSubscription<Uri?>? _widgetSubscription;
   Timer? _syncTimer;
@@ -46,7 +47,9 @@ class _GoalAppState extends State<GoalApp> {
     super.initState();
     _settings = widget.settingsController ?? AppSettingsController.memory();
     widget.store.addListener(_queueExternalSync);
+    widget.lifeStore?.addListener(_queueExternalSync);
     _settings.addListener(_queueExternalSync);
+    _settings.addListener(_applyLifeSettings);
     widget.store.automaticStartsEnabled = _settings.automaticStarts;
     final notifications = widget.notificationService;
     if (notifications != null) {
@@ -59,6 +62,8 @@ class _GoalAppState extends State<GoalApp> {
       unawaited(_load());
     });
   }
+
+  void _applyLifeSettings() => widget.lifeStore?.applySettings(_settings.data);
 
   Future<void> _load() async {
     await widget.store.load();
@@ -164,6 +169,7 @@ class _GoalAppState extends State<GoalApp> {
       await widget.widgetService?.sync(
         widget.store.goals,
         widget.store,
+        widget.lifeStore,
         _settings,
       );
     } on Object {
@@ -180,10 +186,30 @@ class _GoalAppState extends State<GoalApp> {
   }
 
   void _handleWidgetUri(Uri? uri) {
-    if (uri?.scheme != 'goaltracker' || uri?.host != 'goal') return;
+    if (uri?.scheme != 'goaltracker') return;
+    if (uri?.host == 'today') {
+      _lifeShellKey.currentState?.openToday();
+      return;
+    }
+    if (uri?.host == 'calendar') {
+      _lifeShellKey.currentState?.openCalendar();
+      return;
+    }
     final goalId = uri?.queryParameters['id'];
     final context = _navigatorKey.currentContext;
     if (goalId == null || context == null || !context.mounted) return;
+    if (uri?.host == 'task') {
+      final lifeStore = widget.lifeStore;
+      if (lifeStore == null) return;
+      final task = lifeStore.tasks
+          .where((item) => item.id == goalId)
+          .firstOrNull;
+      if (task != null) {
+        showTaskEditor(context, lifeStore, widget.store, task: task);
+      }
+      return;
+    }
+    if (uri?.host != 'goal') return;
     showGoalDetailsSheet(
       context,
       widget.store,
@@ -470,7 +496,9 @@ class _GoalAppState extends State<GoalApp> {
     _notificationSubscription?.cancel();
     _widgetSubscription?.cancel();
     widget.store.removeListener(_queueExternalSync);
+    widget.lifeStore?.removeListener(_queueExternalSync);
     _settings.removeListener(_queueExternalSync);
+    _settings.removeListener(_applyLifeSettings);
     super.dispose();
   }
 
@@ -495,6 +523,7 @@ class _GoalAppState extends State<GoalApp> {
                 notificationService: widget.notificationService,
               )
             : LifeTrackerShell(
+                key: _lifeShellKey,
                 goalStore: widget.store,
                 lifeStore: widget.lifeStore!,
                 settings: _settings,

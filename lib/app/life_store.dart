@@ -1,14 +1,24 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:flutter/foundation.dart';
 
 import '../data/life_repository.dart';
+import '../data/app_settings_repository.dart';
 import '../domain/life_data.dart';
+import '../domain/salah_schedule.dart';
 
 class LifeStore extends ChangeNotifier {
-  LifeStore(this.repository, {DateTime Function()? clock})
-    : _clock = clock ?? DateTime.now;
+  LifeStore(
+    this.repository, {
+    DateTime Function()? clock,
+    AppSettingsData settings = const AppSettingsData(),
+  }) : _clock = clock ?? DateTime.now,
+       _settings = settings;
 
   final LifeRepository repository;
   final DateTime Function() _clock;
+  final SalahSchedule _salahSchedule = SalahSchedule();
+  AppSettingsData _settings;
   LifeData _data = const LifeData();
   bool isLoading = true;
   String? errorMessage;
@@ -19,6 +29,7 @@ class LifeStore extends ChangeNotifier {
   List<LifeTask> get tasks => List.unmodifiable(_data.tasks);
   List<CalendarEntry> get calendar => List.unmodifiable(_data.calendar);
   List<LifeSpace> get spaces => List.unmodifiable(_data.spaces);
+  List<LifeLogEntry> get log => List.unmodifiable(_data.log);
 
   Future<void> load() async {
     isLoading = true;
@@ -40,7 +51,7 @@ class LifeStore extends ChangeNotifier {
       .toList(growable: false);
 
   List<CalendarEntry> entriesFor(DateTime day) =>
-      _data.calendar
+      [..._data.calendar, ..._salahSchedule.entriesFor(day, _settings)]
           .where(
             (entry) =>
                 entry.spaceId == activeSpaceId &&
@@ -54,6 +65,12 @@ class LifeStore extends ChangeNotifier {
           (a, b) => a.occurrenceStart(day).compareTo(b.occurrenceStart(day)),
         );
 
+  void applySettings(AppSettingsData settings) {
+    _settings = settings;
+    _salahSchedule.clear();
+    notifyListeners();
+  }
+
   Future<void> addTask({
     required String title,
     String notes = '',
@@ -62,6 +79,7 @@ class LifeStore extends ChangeNotifier {
     TaskRepeat repeat = TaskRepeat.none,
     String location = '',
     String assignee = '',
+    List<LifeAttachment> attachments = const [],
   }) async {
     final now = _clock();
     final task = LifeTask(
@@ -75,37 +93,35 @@ class LifeStore extends ChangeNotifier {
       location: location.trim(),
       spaceId: activeSpaceId,
       assignee: assignee.trim(),
+      attachments: attachments,
     );
-    _data = LifeData(
-      tasks: [..._data.tasks, task],
-      calendar: _data.calendar,
-      spaces: _data.spaces,
-      activeSpaceId: activeSpaceId,
-      showBlockedTimes: _data.showBlockedTimes,
-    );
+    _data = _data.copyWith(tasks: [..._data.tasks, task]);
     await _save();
   }
 
   Future<void> toggleTask(LifeTask task) async {
-    final replacement = task.isCompleted
-        ? task.copyWith(clearCompleted: true)
-        : task.copyWith(completedAt: _clock());
-    await _replaceTask(replacement);
+    if (!task.isCompleted) {
+      await completeTaskForDate(task, task.dueAt ?? _clock());
+      return;
+    }
+    await _replaceTask(task.copyWith(clearCompleted: true));
   }
 
   Future<void> toggleTaskForDate(LifeTask task, DateTime date) async {
     if (task.repeat == TaskRepeat.none) return toggleTask(task);
     final alreadyDone = task.isDoneOn(date);
-    final dates = alreadyDone
-        ? task.completedDates
-              .where(
-                (item) =>
-                    item.year != date.year ||
-                    item.month != date.month ||
-                    item.day != date.day,
-              )
-              .toList()
-        : [...task.completedDates, DateTime(date.year, date.month, date.day)];
+    if (!alreadyDone) {
+      await completeTaskForDate(task, date);
+      return;
+    }
+    final dates = task.completedDates
+        .where(
+          (item) =>
+              item.year != date.year ||
+              item.month != date.month ||
+              item.day != date.day,
+        )
+        .toList();
     await _replaceTask(task.copyWith(completedDates: dates));
   }
 
@@ -113,6 +129,7 @@ class LifeStore extends ChangeNotifier {
     LifeTask task,
     DateTime date, {
     String note = '',
+    List<LifeAttachment> attachments = const [],
   }) async {
     final day = DateTime(date.year, date.month, date.day);
     final notes = task.completionNotes
@@ -123,14 +140,34 @@ class LifeStore extends ChangeNotifier {
               item.day.day != day.day,
         )
         .toList();
-    if (note.trim().isNotEmpty) {
+    final trimmedNote = note.trim();
+    if (trimmedNote.isNotEmpty || attachments.isNotEmpty) {
       notes.add(
-        TaskCompletionNote(day: day, recordedAt: _clock(), text: note.trim()),
+        TaskCompletionNote(
+          day: day,
+          recordedAt: _clock(),
+          text: trimmedNote,
+          attachments: attachments,
+        ),
       );
     }
+    final now = _clock();
+    final logEntry = LifeLogEntry(
+      id: _id('log', now),
+      createdAt: now,
+      kind: trimmedNote.isEmpty
+          ? LifeLogKind.taskCompleted
+          : LifeLogKind.progressNote,
+      text: trimmedNote,
+      attachments: attachments,
+      taskId: task.id,
+      goalId: task.goalId,
+      spaceId: task.spaceId,
+    );
     if (task.repeat == TaskRepeat.none) {
       await _replaceTask(
-        task.copyWith(completedAt: _clock(), completionNotes: notes),
+        task.copyWith(completedAt: now, completionNotes: notes),
+        logEntry: logEntry,
       );
       return;
     }
@@ -139,6 +176,7 @@ class LifeStore extends ChangeNotifier {
         : [...task.completedDates, day];
     await _replaceTask(
       task.copyWith(completedDates: dates, completionNotes: notes),
+      logEntry: logEntry,
     );
   }
 
@@ -161,31 +199,61 @@ class LifeStore extends ChangeNotifier {
         TaskCompletionNote(day: day, recordedAt: _clock(), text: note.trim()),
       );
     }
-    await _replaceTask(task.copyWith(completionNotes: notes));
+    final now = _clock();
+    await _replaceTask(
+      task.copyWith(completionNotes: notes),
+      logEntry: note.trim().isEmpty
+          ? null
+          : LifeLogEntry(
+              id: _id('log', now),
+              createdAt: now,
+              kind: LifeLogKind.progressNote,
+              text: note.trim(),
+              taskId: task.id,
+              goalId: task.goalId,
+              spaceId: task.spaceId,
+            ),
+    );
+  }
+
+  Future<void> addJournalEntry(
+    String text, {
+    List<LifeAttachment> attachments = const [],
+  }) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty && attachments.isEmpty) return;
+    final now = _clock();
+    _data = _data.copyWith(
+      log: [
+        ..._data.log,
+        LifeLogEntry(
+          id: _id('log', now),
+          createdAt: now,
+          kind: LifeLogKind.journal,
+          text: trimmed,
+          spaceId: activeSpaceId,
+          attachments: attachments,
+        ),
+      ],
+    );
+    await _save();
   }
 
   Future<void> updateTask(LifeTask task) => _replaceTask(task);
 
   Future<void> deleteTask(LifeTask task) async {
-    _data = LifeData(
+    _data = _data.copyWith(
       tasks: _data.tasks.where((item) => item.id != task.id).toList(),
-      calendar: _data.calendar,
-      spaces: _data.spaces,
-      activeSpaceId: activeSpaceId,
-      showBlockedTimes: _data.showBlockedTimes,
     );
     await _save();
   }
 
-  Future<void> _replaceTask(LifeTask task) async {
-    _data = LifeData(
+  Future<void> _replaceTask(LifeTask task, {LifeLogEntry? logEntry}) async {
+    _data = _data.copyWith(
       tasks: _data.tasks
           .map((item) => item.id == task.id ? task : item)
           .toList(),
-      calendar: _data.calendar,
-      spaces: _data.spaces,
-      activeSpaceId: activeSpaceId,
-      showBlockedTimes: _data.showBlockedTimes,
+      log: logEntry == null ? _data.log : [..._data.log, logEntry],
     );
     await _save();
   }
@@ -216,25 +284,15 @@ class LifeStore extends ChangeNotifier {
       repeatUntil: repeatUntil,
       colorValue: colorValue,
     );
-    _data = LifeData(
-      tasks: _data.tasks,
-      calendar: [..._data.calendar, entry],
-      spaces: _data.spaces,
-      activeSpaceId: activeSpaceId,
-      showBlockedTimes: _data.showBlockedTimes,
-    );
+    _data = _data.copyWith(calendar: [..._data.calendar, entry]);
     await _save();
   }
 
   Future<void> updateCalendarEntry(CalendarEntry entry) async {
-    _data = LifeData(
-      tasks: _data.tasks,
+    _data = _data.copyWith(
       calendar: _data.calendar
           .map((item) => item.id == entry.id ? entry : item)
           .toList(),
-      spaces: _data.spaces,
-      activeSpaceId: activeSpaceId,
-      showBlockedTimes: _data.showBlockedTimes,
     );
     await _save();
   }
@@ -292,13 +350,7 @@ class LifeStore extends ChangeNotifier {
       imported.add(entry);
     }
     if (imported.isEmpty) return 0;
-    _data = LifeData(
-      tasks: _data.tasks,
-      calendar: [..._data.calendar, ...imported],
-      spaces: _data.spaces,
-      activeSpaceId: activeSpaceId,
-      showBlockedTimes: _data.showBlockedTimes,
-    );
+    _data = _data.copyWith(calendar: [..._data.calendar, ...imported]);
     await _save();
     return imported.length;
   }
@@ -341,36 +393,20 @@ class LifeStore extends ChangeNotifier {
   }
 
   Future<void> deleteCalendarEntry(CalendarEntry entry) async {
-    _data = LifeData(
-      tasks: _data.tasks,
+    _data = _data.copyWith(
       calendar: _data.calendar.where((item) => item.id != entry.id).toList(),
-      spaces: _data.spaces,
-      activeSpaceId: activeSpaceId,
-      showBlockedTimes: _data.showBlockedTimes,
     );
     await _save();
   }
 
   Future<void> setShowBlockedTimes(bool value) async {
-    _data = LifeData(
-      tasks: _data.tasks,
-      calendar: _data.calendar,
-      spaces: _data.spaces,
-      activeSpaceId: activeSpaceId,
-      showBlockedTimes: value,
-    );
+    _data = _data.copyWith(showBlockedTimes: value);
     await _save();
   }
 
   Future<void> selectSpace(String id) async {
     if (!_data.spaces.any((space) => space.id == id)) return;
-    _data = LifeData(
-      tasks: _data.tasks,
-      calendar: _data.calendar,
-      spaces: _data.spaces,
-      activeSpaceId: id,
-      showBlockedTimes: _data.showBlockedTimes,
-    );
+    _data = _data.copyWith(activeSpaceId: id);
     await _save();
   }
 
@@ -382,12 +418,9 @@ class LifeStore extends ChangeNotifier {
       isShared: true,
       members: const [SpaceMember(name: 'You', role: SpaceRole.owner)],
     );
-    _data = LifeData(
-      tasks: _data.tasks,
-      calendar: _data.calendar,
+    _data = _data.copyWith(
       spaces: [..._data.spaces, shared],
       activeSpaceId: shared.id,
-      showBlockedTimes: _data.showBlockedTimes,
     );
     await _save();
   }
@@ -405,12 +438,22 @@ class LifeStore extends ChangeNotifier {
         ],
       );
     }).toList();
-    _data = LifeData(
-      tasks: _data.tasks,
-      calendar: _data.calendar,
-      spaces: spaces,
-      activeSpaceId: activeSpaceId,
-      showBlockedTimes: _data.showBlockedTimes,
+    _data = _data.copyWith(spaces: spaces);
+    await _save();
+  }
+
+  Future<void> setProfileImage(String? path) async {
+    _data = _data.copyWith(
+      spaces: _data.spaces
+          .map(
+            (space) => space.id == activeSpaceId
+                ? space.copyWith(
+                    profileImagePath: path,
+                    clearProfileImage: path == null || path.isEmpty,
+                  )
+                : space,
+          )
+          .toList(),
     );
     await _save();
   }

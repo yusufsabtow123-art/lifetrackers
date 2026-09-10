@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/goal_store.dart';
 import '../app/life_store.dart';
@@ -6,6 +7,7 @@ import '../app/theme_controller.dart';
 import '../domain/goal.dart';
 import '../platform/goal_notification_service.dart';
 import '../platform/goal_widget_service.dart';
+import '../platform/salah_location_service.dart';
 import 'app_theme.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -32,6 +34,12 @@ class SettingsPage extends StatelessWidget {
         () => _open(context, 'Appearance', _AppearanceSettings(settings)),
       ),
       _SettingsEntry(
+        'Calendar and Salah',
+        'Protected prayer times, location, calculation, and block duration.',
+        Icons.calendar_month_outlined,
+        () => _open(context, 'Calendar and Salah', _CalendarSettings(settings)),
+      ),
+      _SettingsEntry(
         'Board and categories',
         'Category movement and visibility, progress labels, and Abandoned.',
         Icons.view_kanban_outlined,
@@ -39,23 +47,23 @@ class SettingsPage extends StatelessWidget {
       ),
       _SettingsEntry(
         'Opened goals',
-        'Simple or Detailed defaults, remembered views, and milestones.',
+        'Simple or Detailed defaults and remembered views.',
         Icons.view_agenda_outlined,
         () => _open(context, 'Opened goals', _OpenedGoalSettings(settings)),
       ),
       _SettingsEntry(
-        'Notifications and check-ins',
+        'Notifications',
         'Default timing, frequency, quiet hours, and end-of-day review.',
         Icons.notifications_outlined,
         () => _open(
           context,
-          'Notifications and check-ins',
+          'Notifications',
           _NotificationSettings(settings, notificationService),
         ),
       ),
       _SettingsEntry(
         'Goal scheduling',
-        'Automatic starts, connected goals, and schedule-warning behavior.',
+        'Control when planned goals begin.',
         Icons.route_outlined,
         () => _open(context, 'Goal scheduling', _PlanSettings(settings)),
       ),
@@ -63,8 +71,11 @@ class SettingsPage extends StatelessWidget {
         'Android widgets',
         'Choose which actions, cards, categories, and progress appear.',
         Icons.widgets_outlined,
-        () =>
-            _open(context, 'Android widgets', _WidgetSettings(settings, store)),
+        () => _open(
+          context,
+          'Android widgets',
+          _WidgetSettings(settings, store, lifeStore),
+        ),
       ),
       _SettingsEntry(
         'Local data',
@@ -93,19 +104,19 @@ class SettingsPage extends StatelessWidget {
                   icon: Icons.notifications_outlined,
                   title: 'Notifications',
                   value: settings.notificationsEnabled ? 'On' : 'Off',
-                  onTap: entries[3].onTap,
+                  onTap: entries[4].onTap,
                 ),
                 _ReferenceSettingRow(
                   icon: Icons.calendar_today_outlined,
                   title: 'Calendar',
-                  value: '',
-                  onTap: entries[4].onTap,
+                  value: settings.salahEnabled ? 'Salah on' : 'Salah off',
+                  onTap: entries[1].onTap,
                 ),
                 _ReferenceSettingRow(
                   icon: Icons.folder_outlined,
                   title: 'Data',
                   value: 'On this device',
-                  onTap: entries[6].onTap,
+                  onTap: entries[7].onTap,
                 ),
                 _ReferenceSettingRow(
                   icon: Icons.accessibility_new_rounded,
@@ -124,22 +135,22 @@ class SettingsPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 _ReferenceSettingRow(
-                  icon: entries[1].icon,
-                  title: 'Board and categories',
-                  value: '',
-                  onTap: entries[1].onTap,
-                ),
-                _ReferenceSettingRow(
                   icon: entries[2].icon,
-                  title: 'Opened goals',
+                  title: 'Board and categories',
                   value: '',
                   onTap: entries[2].onTap,
                 ),
                 _ReferenceSettingRow(
-                  icon: entries[5].icon,
+                  icon: entries[3].icon,
+                  title: 'Opened goals',
+                  value: '',
+                  onTap: entries[3].onTap,
+                ),
+                _ReferenceSettingRow(
+                  icon: entries[6].icon,
                   title: 'Android widgets',
                   value: '',
-                  onTap: entries[5].onTap,
+                  onTap: entries[6].onTap,
                 ),
                 const SizedBox(height: 28),
                 Text(
@@ -199,8 +210,8 @@ class SettingsPage extends StatelessWidget {
               _InlineSettingsRow(
                 icon: Icons.notifications_none_rounded,
                 title: 'Notifications',
-                subtitle: 'Daily reminders and completion check-ins',
-                onTap: entries[3].onTap,
+                subtitle: 'Daily reminders and quiet hours',
+                onTap: entries[4].onTap,
                 trailing: Switch(
                   value: settings.notificationsEnabled,
                   onChanged: settings.setNotificationsEnabled,
@@ -210,14 +221,14 @@ class SettingsPage extends StatelessWidget {
                 icon: Icons.calendar_today_outlined,
                 title: 'Calendar',
                 subtitle: 'Scheduling, recurrence, and plan warnings',
-                onTap: entries[4].onTap,
+                onTap: entries[1].onTap,
                 trailing: const Icon(Icons.chevron_right_rounded, size: 18),
               ),
               _InlineSettingsRow(
                 icon: Icons.storage_outlined,
                 title: 'Data',
                 subtitle: 'Goals, tasks, and calendar stay on this device',
-                onTap: entries[6].onTap,
+                onTap: entries[7].onTap,
                 trailing: const Icon(Icons.chevron_right_rounded, size: 18),
               ),
             ],
@@ -237,17 +248,17 @@ class SettingsPage extends StatelessWidget {
                 trailing: const Icon(Icons.chevron_right_rounded, size: 18),
               ),
               _InlineSettingsRow(
-                icon: entries[1].icon,
+                icon: entries[2].icon,
                 title: 'Goals and board',
                 subtitle: 'Categories, progress labels, and board behavior',
-                onTap: entries[1].onTap,
+                onTap: entries[2].onTap,
                 trailing: const Icon(Icons.chevron_right_rounded, size: 18),
               ),
               _InlineSettingsRow(
-                icon: entries[5].icon,
+                icon: entries[6].icon,
                 title: 'Android widgets',
                 subtitle: 'Choose which actions and progress appear',
-                onTap: entries[5].onTap,
+                onTap: entries[6].onTap,
                 trailing: const Icon(Icons.chevron_right_rounded, size: 18),
               ),
             ],
@@ -554,6 +565,31 @@ class _AccessibilitySettings extends StatelessWidget {
   }
 }
 
+Future<void> _useCurrentSalahLocation(
+  BuildContext context,
+  AppSettingsController settings,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final location = await SalahLocationService.current();
+    await settings.setSalahManualLocation(
+      name: 'Current location',
+      latitude: location.latitude,
+      longitude: location.longitude,
+      timeZone: location.timeZone,
+    );
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Prayer location updated.')),
+    );
+  } on PlatformException catch (error) {
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(error.message ?? 'Location could not be updated.'),
+      ),
+    );
+  }
+}
+
 class _BoardSettings extends StatelessWidget {
   const _BoardSettings(this.settings);
   final AppSettingsController settings;
@@ -677,26 +713,273 @@ class _OpenedGoalSettings extends StatelessWidget {
           value: settings.rememberGoalDetailView,
           onChanged: settings.setRememberGoalDetailView,
         ),
-        const Divider(),
+      ],
+    ),
+  );
+}
+
+class _CalendarSettings extends StatelessWidget {
+  const _CalendarSettings(this.settings);
+  final AppSettingsController settings;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: settings,
+    builder: (context, _) => _SettingsCard(
+      children: [
         SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Milestones'),
-          subtitle: const Text('Optional and off by default.'),
-          value: settings.milestonesEnabled,
-          onChanged: settings.setMilestonesEnabled,
-        ),
-        const ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.lock_clock_outlined),
-          title: Text('Milestone effort estimates'),
-          subtitle: Text(
-            'Not available until the optional local AI can explain each estimate.',
+          key: const Key('salah-calendar-enabled'),
+          secondary: const Icon(Icons.mosque_outlined),
+          title: const Text('Protect Salah times'),
+          subtitle: const Text(
+            'Show Fajr, Dhuhr, Asr, Maghrib, and Isha as protected calendar blocks.',
           ),
-          trailing: Chip(label: Text('Later')),
+          value: settings.salahEnabled,
+          onChanged: settings.setSalahEnabled,
+        ),
+        ListTile(
+          enabled: settings.salahEnabled,
+          leading: const Icon(Icons.location_on_outlined),
+          title: const Text('Prayer location'),
+          subtitle: Text(
+            '${settings.data.salahLocationName}\n${settings.data.salahTimeZone}',
+          ),
+          isThreeLine: true,
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: settings.salahEnabled
+              ? () => _editSalahLocation(context, settings)
+              : null,
+        ),
+        ListTile(
+          enabled: settings.salahEnabled,
+          leading: const Icon(Icons.my_location_rounded),
+          title: const Text('Use current location'),
+          subtitle: const Text(
+            'Ask Android once, then calculate prayer times locally.',
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: settings.salahEnabled
+              ? () => _useCurrentSalahLocation(context, settings)
+              : null,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: DropdownButtonFormField<SalahCalculationMethod>(
+            isExpanded: true,
+            initialValue: settings.salahCalculationMethod,
+            decoration: const InputDecoration(
+              labelText: 'Calculation method',
+              prefixIcon: Icon(Icons.calculate_outlined),
+            ),
+            items: [
+              for (final method in SalahCalculationMethod.values)
+                DropdownMenuItem(value: method, child: Text(method.label)),
+            ],
+            onChanged: settings.salahEnabled
+                ? (value) {
+                    if (value != null) {
+                      settings.setSalahCalculationMethod(value);
+                    }
+                  }
+                : null,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: DropdownButtonFormField<SalahAsrMethod>(
+            isExpanded: true,
+            initialValue: settings.salahAsrMethod,
+            decoration: const InputDecoration(
+              labelText: 'Asr convention',
+              prefixIcon: Icon(Icons.schedule_outlined),
+            ),
+            items: [
+              for (final method in SalahAsrMethod.values)
+                DropdownMenuItem(value: method, child: Text(method.label)),
+            ],
+            onChanged: settings.salahEnabled
+                ? (value) {
+                    if (value != null) settings.setSalahAsrMethod(value);
+                  }
+                : null,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: DropdownButtonFormField<int>(
+            isExpanded: true,
+            initialValue: settings.data.salahBlockMinutes,
+            decoration: const InputDecoration(
+              labelText: 'Protected block duration',
+              prefixIcon: Icon(Icons.timelapse_outlined),
+            ),
+            items: const [
+              DropdownMenuItem(value: 15, child: Text('15 minutes')),
+              DropdownMenuItem(value: 30, child: Text('30 minutes')),
+              DropdownMenuItem(value: 45, child: Text('45 minutes')),
+              DropdownMenuItem(value: 60, child: Text('1 hour')),
+            ],
+            onChanged: settings.salahEnabled
+                ? (value) {
+                    if (value != null) settings.setSalahBlockMinutes(value);
+                  }
+                : null,
+          ),
+        ),
+        ExpansionTile(
+          leading: const Icon(Icons.tune_rounded),
+          title: const Text('Advanced calculation'),
+          subtitle: const Text('High-latitude rule and local minute offsets'),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: DropdownButtonFormField<SalahHighLatitudeRule>(
+                isExpanded: true,
+                initialValue: settings.salahHighLatitudeRule,
+                decoration: const InputDecoration(
+                  labelText: 'High-latitude rule',
+                ),
+                items: [
+                  for (final rule in SalahHighLatitudeRule.values)
+                    DropdownMenuItem(value: rule, child: Text(rule.label)),
+                ],
+                onChanged: settings.salahEnabled
+                    ? (value) {
+                        if (value != null) {
+                          settings.setSalahHighLatitudeRule(value);
+                        }
+                      }
+                    : null,
+              ),
+            ),
+            for (final prayer in const [
+              'Fajr',
+              'Dhuhr',
+              'Asr',
+              'Maghrib',
+              'Isha',
+            ])
+              ListTile(
+                enabled: settings.salahEnabled,
+                title: Text('$prayer adjustment'),
+                subtitle: const Text('Use only to match your local masjid'),
+                trailing: DropdownButton<int>(
+                  value: settings.data.salahAdjustments[prayer] ?? 0,
+                  items: [
+                    for (final value in const [-10, -5, 0, 5, 10])
+                      DropdownMenuItem(
+                        value: value,
+                        child: Text(
+                          value == 0
+                              ? 'None'
+                              : '${value > 0 ? '+' : ''}$value min',
+                        ),
+                      ),
+                  ],
+                  onChanged: settings.salahEnabled
+                      ? (value) {
+                          if (value != null) {
+                            settings.setSalahAdjustment(prayer, value);
+                          }
+                        }
+                      : null,
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
         ),
       ],
     ),
   );
+}
+
+Future<void> _editSalahLocation(
+  BuildContext context,
+  AppSettingsController settings,
+) async {
+  final name = TextEditingController(text: settings.data.salahLocationName);
+  final latitude = TextEditingController(
+    text: settings.data.salahLatitude.toString(),
+  );
+  final longitude = TextEditingController(
+    text: settings.data.salahLongitude.toString(),
+  );
+  final timeZone = TextEditingController(text: settings.data.salahTimeZone);
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Manual prayer location'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: name,
+              decoration: const InputDecoration(labelText: 'Place name'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: latitude,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+                signed: true,
+              ),
+              decoration: const InputDecoration(labelText: 'Latitude'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: longitude,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+                signed: true,
+              ),
+              decoration: const InputDecoration(labelText: 'Longitude'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: timeZone,
+              decoration: const InputDecoration(
+                labelText: 'IANA time zone',
+                hintText: 'America/Chicago',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final lat = double.tryParse(latitude.text);
+            final lon = double.tryParse(longitude.text);
+            if (lat == null ||
+                lon == null ||
+                lat.abs() > 90 ||
+                lon.abs() > 180) {
+              return;
+            }
+            await settings.setSalahManualLocation(
+              name: name.text.trim().isEmpty
+                  ? 'Manual location'
+                  : name.text.trim(),
+              latitude: lat,
+              longitude: lon,
+              timeZone: timeZone.text.trim(),
+            );
+            if (dialogContext.mounted) Navigator.pop(dialogContext);
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
+  name.dispose();
+  latitude.dispose();
+  longitude.dispose();
+  timeZone.dispose();
 }
 
 class _NotificationSettings extends StatefulWidget {
@@ -979,56 +1262,16 @@ class _PlanSettings extends StatelessWidget {
           value: settings.automaticStarts,
           onChanged: settings.setAutomaticStarts,
         ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<ConnectedGoalBehavior>(
-          initialValue: settings.connectedGoalBehavior,
-          decoration: const InputDecoration(
-            labelText: 'When a connected goal becomes available',
-          ),
-          items: [
-            for (final item in ConnectedGoalBehavior.values)
-              DropdownMenuItem(value: item, child: Text(item.label)),
-          ],
-          onChanged: (value) {
-            if (value != null) settings.setConnectedGoalBehavior(value);
-          },
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Schedule adaptation',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 5),
-        const Text(
-          'Natural is recommended: small changes happen quietly, while '
-          'meaningful pace or deadline changes show a warning first.',
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final mode in AdaptiveWarningMode.values)
-              ChoiceChip(
-                selected: settings.adaptiveWarningMode == mode,
-                label: Text(mode.label),
-                onSelected: (_) => settings.setAdaptiveWarningMode(mode),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Each goal can override the global choice from its own detailed view.',
-        ),
       ],
     ),
   );
 }
 
 class _WidgetSettings extends StatelessWidget {
-  const _WidgetSettings(this.settings, this.store);
+  const _WidgetSettings(this.settings, this.store, this.lifeStore);
   final AppSettingsController settings;
   final GoalStore store;
+  final LifeStore? lifeStore;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -1115,9 +1358,18 @@ class _WidgetSettings extends StatelessWidget {
               icon: const Icon(Icons.view_kanban_outlined),
               label: const Text('Add Goal Cards widget'),
             ),
+            OutlinedButton.icon(
+              onPressed: () => GoalWidgetService().requestPinCalendarWidget(),
+              icon: const Icon(Icons.calendar_view_day_outlined),
+              label: const Text('Add Calendar widget'),
+            ),
             FilledButton.icon(
-              onPressed: () =>
-                  GoalWidgetService().sync(store.goals, store, settings),
+              onPressed: () => GoalWidgetService().sync(
+                store.goals,
+                store,
+                lifeStore,
+                settings,
+              ),
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Refresh widgets'),
             ),

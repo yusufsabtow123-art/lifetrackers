@@ -1,22 +1,29 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/goal_store.dart';
 import '../app/life_store.dart';
 import '../app/theme_controller.dart';
 import '../domain/goal.dart';
 import '../domain/life_data.dart';
+import '../domain/natural_task_parser.dart';
 import '../domain/plan_calculator.dart';
 import '../platform/goal_notification_service.dart';
+import '../platform/attachment_picker.dart';
 import 'app_theme.dart';
 import 'goal_details_sheet.dart';
 import 'life_calendar_page.dart';
 import 'life_goals_page.dart';
 import 'life_icons.dart';
 import 'life_quotes.dart';
+import 'link_text.dart';
 import 'settings_page.dart';
 import 'speech_input_button.dart';
+import 'task_completion_sheet.dart';
 
-enum _Destination { today, goals, tasks, calendar, spaces, ai, more }
+enum _Destination { today, goals, tasks, calendar, log, spaces, ai, more }
 
 class LifeTrackerShell extends StatefulWidget {
   const LifeTrackerShell({
@@ -33,13 +40,17 @@ class LifeTrackerShell extends StatefulWidget {
   final GoalNotificationService? notificationService;
 
   @override
-  State<LifeTrackerShell> createState() => _LifeTrackerShellState();
+  State<LifeTrackerShell> createState() => LifeTrackerShellState();
 }
 
-class _LifeTrackerShellState extends State<LifeTrackerShell> {
+class LifeTrackerShellState extends State<LifeTrackerShell> {
   _Destination _destination = _Destination.today;
 
-  void selectDestination(_Destination destination) {
+  void openToday() => setState(() => _destination = _Destination.today);
+
+  void openCalendar() => setState(() => _destination = _Destination.calendar);
+
+  void _selectDestination(_Destination destination) {
     setState(() => _destination = destination);
   }
 
@@ -130,6 +141,10 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
       lifeStore: widget.lifeStore,
       settings: widget.settings,
     ),
+    _Destination.log => LogPage(
+      goalStore: widget.goalStore,
+      lifeStore: widget.lifeStore,
+    ),
     _Destination.spaces => SpacesPage(store: widget.lifeStore),
     _Destination.ai => _AiPage(
       onPlan: () => setState(() => _destination = _Destination.goals),
@@ -148,6 +163,7 @@ class _LifeTrackerShellState extends State<LifeTrackerShell> {
               settings: widget.settings,
               notificationService: widget.notificationService,
               onAi: () => setState(() => _destination = _Destination.ai),
+              onLog: () => setState(() => _destination = _Destination.log),
               onSpaces: _showSpaces,
               onSettings: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -247,7 +263,7 @@ class _LifeBottomBar extends StatelessWidget {
 
 class _DesktopNavigation extends StatelessWidget {
   const _DesktopNavigation({required this.state});
-  final _LifeTrackerShellState state;
+  final LifeTrackerShellState state;
 
   @override
   Widget build(BuildContext context) {
@@ -303,6 +319,12 @@ class _DesktopNavigation extends StatelessWidget {
             destination: _Destination.calendar,
             glyph: LifeGlyph.calendar,
             label: 'Calendar',
+          ),
+          _NavItem(
+            state: state,
+            destination: _Destination.log,
+            glyph: LifeGlyph.file,
+            label: 'Log',
           ),
           _NavItem(
             state: state,
@@ -362,7 +384,7 @@ class _NavItem extends StatelessWidget {
     required this.glyph,
     required this.label,
   });
-  final _LifeTrackerShellState state;
+  final LifeTrackerShellState state;
   final _Destination destination;
   final LifeGlyph glyph;
   final String label;
@@ -382,7 +404,7 @@ class _NavItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         child: InkWell(
           borderRadius: BorderRadius.circular(6),
-          onTap: () => state.selectDestination(destination),
+          onTap: () => state._selectDestination(destination),
           child: Container(
             decoration: BoxDecoration(
               border: selected
@@ -474,7 +496,10 @@ class TodayPage extends StatelessWidget {
               progressFormat: settings.progressFormat,
               settings: settings,
             ),
-            onToggle: () => goalStore.completeTodayAction(action.goal.id),
+            onToggle: () async {
+              await goalStore.completeTodayAction(action.goal.id);
+              await _playCompletionFeedback(finishedDay: remaining == 1);
+            },
           ),
         ),
       for (final task in pendingTasks)
@@ -490,8 +515,9 @@ class TodayPage extends StatelessWidget {
             store: lifeStore,
             date: today,
             completionCheckIns: settings.completionCheckIns,
+            finishDayOnComplete: remaining == 1,
             onOpen: () =>
-                _showTaskEditor(context, lifeStore, goalStore, task: task),
+                showTaskEditor(context, lifeStore, goalStore, task: task),
           ),
         ),
       for (final entry in entries)
@@ -501,7 +527,9 @@ class TodayPage extends StatelessWidget {
           child: _CalendarTile(entry: entry, store: lifeStore),
         ),
     ]..sort((a, b) => a.order.compareTo(b.order));
-    final wide = MediaQuery.sizeOf(context).width >= 980;
+    // Android tablets keep the same glanceable hierarchy as phones instead of
+    // repeating the daily plan in a second focus panel.
+    final wide = MediaQuery.sizeOf(context).width >= 980 && !Platform.isAndroid;
     final nextTitle = goals.isNotEmpty
         ? goals.first.goal.name
         : pendingTasks.isNotEmpty
@@ -558,12 +586,8 @@ class TodayPage extends StatelessWidget {
                   task: task,
                   store: lifeStore,
                   date: today,
-                  onOpen: () => _showTaskEditor(
-                    context,
-                    lifeStore,
-                    goalStore,
-                    task: task,
-                  ),
+                  onOpen: () =>
+                      showTaskEditor(context, lifeStore, goalStore, task: task),
                 ),
             ],
           ),
@@ -574,21 +598,15 @@ class TodayPage extends StatelessWidget {
       title: 'Today',
       subtitle: _friendlyDate(today),
       action: wide
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.search_rounded, size: 19, color: context.appMuted),
-                const SizedBox(width: 24),
-                Text(
-                  'A more intentional day',
-                  style: TextStyle(fontSize: 11, color: context.appMuted),
-                ),
-              ],
+          ? FilledButton.tonalIcon(
+              onPressed: () => _showQuickTaskCapture(context, lifeStore),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Quick task'),
             )
           : IconButton(
-              tooltip: 'Open calendar',
-              onPressed: () {},
-              icon: const Icon(Icons.calendar_today_outlined, size: 20),
+              tooltip: 'Quickly add a task',
+              onPressed: () => _showQuickTaskCapture(context, lifeStore),
+              icon: const Icon(Icons.add_rounded, size: 22),
             ),
       child: Column(
         children: [
@@ -600,17 +618,27 @@ class TodayPage extends StatelessWidget {
             onSpeak: remaining == 0
                 ? null
                 : goals.isNotEmpty
-                ? () => _showGoalActionCheckIn(
-                    context,
-                    goalStore,
-                    goals.first.goal,
-                  )
-                : () => _showTaskCompletionCheckIn(
-                    context,
-                    lifeStore,
-                    pendingTasks.first,
-                    today,
-                  ),
+                ? () async {
+                    final completed = await _showGoalActionCheckIn(
+                      context,
+                      goalStore,
+                      goals.first.goal,
+                    );
+                    if (completed) {
+                      await _playCompletionFeedback(finishedDay: remaining == 1);
+                    }
+                  }
+                : () async {
+                    final completed = await _showTaskCompletionCheckIn(
+                      context,
+                      lifeStore,
+                      pendingTasks.first,
+                      today,
+                    );
+                    if (completed) {
+                      await _playCompletionFeedback(finishedDay: remaining == 1);
+                    }
+                  },
           ),
           const SizedBox(height: 20),
           Expanded(
@@ -738,32 +766,46 @@ class _LifeProgressRing extends StatelessWidget {
   final double stroke;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: size,
-    height: size,
-    child: Stack(
-      alignment: Alignment.center,
-      children: [
-        SizedBox.expand(
-          child: CircularProgressIndicator(
-            value: value.clamp(0, 1),
-            strokeWidth: stroke,
-            strokeCap: StrokeCap.round,
-            backgroundColor: context.appBorder,
-          ),
-        ),
-        Align(
-          alignment: Alignment.topCenter,
-          child: Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              shape: BoxShape.circle,
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(end: value.clamp(0, 1)),
+    duration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : LifeMotion.deliberate,
+    curve: LifeMotion.curve,
+    builder: (context, progress, _) => SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox.expand(
+            child: CircularProgressIndicator(
+              value: progress,
+              strokeWidth: stroke,
+              strokeCap: StrokeCap.round,
+              backgroundColor: context.appBorder,
             ),
           ),
-        ),
-      ],
+          AnimatedSwitcher(
+            duration: LifeMotion.quick,
+            child: progress >= .999
+                ? Icon(
+                    Icons.check_rounded,
+                    key: const ValueKey('complete'),
+                    size: size * .36,
+                    color: context.appSuccess,
+                  )
+                : Text(
+                    '${(progress * 100).round()}%',
+                    key: const ValueKey('progress'),
+                    style: TextStyle(
+                      fontSize: size * .18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -983,7 +1025,7 @@ class _TasksPageState extends State<TasksPage> {
       subtitle: '',
       action: FilledButton.icon(
         onPressed: () =>
-            _showTaskEditor(context, widget.lifeStore, widget.goalStore),
+            showTaskEditor(context, widget.lifeStore, widget.goalStore),
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add task'),
       ),
@@ -1015,7 +1057,7 @@ class _TasksPageState extends State<TasksPage> {
                           store: widget.lifeStore,
                           completionCheckIns:
                               widget.settings.completionCheckIns,
-                          onOpen: () => _showTaskEditor(
+                          onOpen: () => showTaskEditor(
                             context,
                             widget.lifeStore,
                             widget.goalStore,
@@ -1062,7 +1104,7 @@ class _TasksPageState extends State<TasksPage> {
                               date: _filter == 0 ? now : null,
                               completionCheckIns:
                                   widget.settings.completionCheckIns,
-                              onOpen: () => _showTaskEditor(
+                              onOpen: () => showTaskEditor(
                                 context,
                                 widget.lifeStore,
                                 widget.goalStore,
@@ -1468,6 +1510,27 @@ class SpacesPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
+          _SurfaceTile(
+            icon: Icons.account_circle_outlined,
+            leading: CircleAvatar(
+              radius: 22,
+              backgroundImage: active.profileImagePath.isEmpty
+                  ? null
+                  : FileImage(File(active.profileImagePath)),
+              child: active.profileImagePath.isEmpty
+                  ? const Icon(Icons.person_outline_rounded)
+                  : null,
+            ),
+            title: 'Your profile picture',
+            subtitle: active.profileImagePath.isEmpty
+                ? 'Add a photo'
+                : 'Tap to change · Long press to remove',
+            onTap: () => _chooseProfileImage(context),
+            onLongPress: active.profileImagePath.isEmpty
+                ? null
+                : () => store.setProfileImage(null),
+          ),
+          const SizedBox(height: 8),
           for (final space in store.spaces.where(
             (s) => s.isShared == active.isShared,
           ))
@@ -1692,6 +1755,20 @@ class SpacesPage extends StatelessWidget {
     controller.dispose();
   }
 
+  Future<void> _chooseProfileImage(BuildContext context) async {
+    try {
+      final image = await AttachmentPicker.choose(imageOnly: true);
+      if (image != null) await store.setProfileImage(image.path);
+    } on PlatformException {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('That profile image could not be imported.'),
+        ),
+      );
+    }
+  }
+
   Future<void> _addMember(BuildContext context) async {
     final controller = TextEditingController();
     var role = SpaceRole.member;
@@ -1749,6 +1826,359 @@ class SpacesPage extends StatelessWidget {
   }
 }
 
+class LogPage extends StatefulWidget {
+  const LogPage({super.key, required this.goalStore, required this.lifeStore});
+  final GoalStore goalStore;
+  final LifeStore lifeStore;
+
+  @override
+  State<LogPage> createState() => _LogPageState();
+}
+
+class _LogPageState extends State<LogPage> {
+  final _search = TextEditingController();
+  String _query = '';
+  String _filter = 'all';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final taskById = {for (final task in widget.lifeStore.tasks) task.id: task};
+    final goalById = {for (final goal in widget.goalStore.goals) goal.id: goal};
+    final stored = widget.lifeStore.log
+        .where((entry) => entry.spaceId == widget.lifeStore.activeSpaceId)
+        .toList();
+    final storedNoteKeys = {
+      for (final entry in stored)
+        if (entry.taskId != null && entry.kind == LifeLogKind.progressNote)
+          '${entry.taskId}|${entry.createdAt.toIso8601String()}|${entry.text}',
+    };
+    final legacy = <LifeLogEntry>[
+      for (final task in widget.lifeStore.tasks)
+        for (final note in task.completionNotes)
+          if (!storedNoteKeys.contains(
+            '${task.id}|${note.recordedAt.toIso8601String()}|${note.text}',
+          ))
+            LifeLogEntry(
+              id: 'legacy-${task.id}-${note.recordedAt.microsecondsSinceEpoch}',
+              createdAt: note.recordedAt,
+              kind: LifeLogKind.progressNote,
+              text: note.text,
+              taskId: task.id,
+              goalId: task.goalId,
+              spaceId: task.spaceId,
+              attachments: note.attachments,
+            ),
+    ];
+    final entries = [...stored, ...legacy]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final visible = entries.where((entry) {
+      final task = entry.taskId == null ? null : taskById[entry.taskId];
+      final goal = entry.goalId == null ? null : goalById[entry.goalId];
+      final matchesFilter = switch (_filter) {
+        'tasks' => entry.taskId != null,
+        'goals' => entry.goalId != null,
+        'journal' => entry.kind == LifeLogKind.journal,
+        _ => true,
+      };
+      final haystack = '${entry.text} ${task?.title ?? ''} '
+          '${goal?.name ?? ''}'.toLowerCase();
+      return matchesFilter &&
+          (_query.isEmpty || haystack.contains(_query.toLowerCase()));
+    }).toList();
+    return _PageFrame(
+      title: 'Log',
+      subtitle: 'A connected history of what actually happened.',
+      action: IconButton(
+        tooltip: 'Write a journal entry',
+        onPressed: () => _addJournal(context),
+        icon: const Icon(Icons.add_rounded),
+      ),
+      child: Column(
+        children: [
+          TextField(
+            controller: _search,
+            onChanged: (value) => setState(() => _query = value.trim()),
+            decoration: const InputDecoration(
+              hintText: 'Search notes, tasks, or goals',
+              prefixIcon: Icon(Icons.search_rounded),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final option in const {
+                  'all': 'All',
+                  'tasks': 'Tasks',
+                  'goals': 'Goals',
+                  'journal': 'Journal',
+                }.entries) ...[
+                  ChoiceChip(
+                    label: Text(option.value),
+                    selected: _filter == option.key,
+                    onSelected: (_) => setState(() => _filter = option.key),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: visible.isEmpty
+                ? _EmptyCard(
+                    icon: Icons.history_rounded,
+                    title: _query.isEmpty
+                        ? 'Your story starts here'
+                        : 'No matches',
+                    body: _query.isEmpty
+                        ? 'Task completions and optional progress notes will appear here.'
+                        : 'Try a different search.',
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 28),
+                    itemCount: visible.length,
+                    itemBuilder: (context, index) {
+                      final entry = visible[index];
+                      final task = entry.taskId == null
+                          ? null
+                          : taskById[entry.taskId];
+                      final goal = entry.goalId == null
+                          ? null
+                          : widget.goalStore.goals
+                                .where((item) => item.id == entry.goalId)
+                                .firstOrNull;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _SurfaceTile(
+                          icon: entry.kind == LifeLogKind.journal
+                              ? Icons.edit_note_rounded
+                              : Icons.check_circle_outline_rounded,
+                          title: task?.title ?? goal?.name ?? 'Journal',
+                          subtitle: [
+                            _friendlyDate(entry.createdAt),
+                            if (goal != null && task != null) goal.name,
+                            if (entry.text.isNotEmpty) entry.text,
+                            if (entry.attachments.isNotEmpty)
+                              '${entry.attachments.length} attachment${entry.attachments.length == 1 ? '' : 's'}',
+                          ].join(' · '),
+                          onTap: () => _showEntry(
+                            context,
+                            entry,
+                            taskTitle: task?.title,
+                            goalTitle: goal?.name,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showEntry(
+    BuildContext context,
+    LifeLogEntry entry, {
+    String? taskTitle,
+    String? goalTitle,
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (context) => Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .78,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                taskTitle ?? goalTitle ?? 'Journal entry',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                [
+                  _friendlyDate(entry.createdAt),
+                  if (taskTitle != null && goalTitle != null) goalTitle,
+                ].join(' · '),
+                style: TextStyle(color: context.appMuted),
+              ),
+              if (entry.text.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                LinkText(
+                  entry.text,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ],
+              if (entry.attachments.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'Attachments',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                for (final attachment in entry.attachments) ...[
+                  if (attachment.kind == LifeAttachmentKind.image &&
+                      File(attachment.path).existsSync())
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(attachment.path),
+                        height: 180,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      attachment.kind == LifeAttachmentKind.image
+                          ? Icons.image_outlined
+                          : Icons.description_outlined,
+                    ),
+                    title: Text(
+                      attachment.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(_fileSize(attachment.sizeBytes)),
+                    trailing: const Icon(Icons.open_in_new_rounded),
+                    onTap: () => AttachmentPicker.open(attachment),
+                  ),
+                ],
+              ],
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Future<void> _addJournal(BuildContext context) async {
+    final controller = TextEditingController();
+    final attachments = <LifeAttachment>[];
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => AnimatedPadding(
+          duration: LifeMotion.quick,
+          padding: EdgeInsets.fromLTRB(
+            20,
+            2,
+            20,
+            MediaQuery.viewInsetsOf(sheetContext).bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'New log entry',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  minLines: 4,
+                  maxLines: 10,
+                  contentInsertionConfiguration:
+                      ContentInsertionConfiguration(
+                        allowedMimeTypes: const [
+                          'image/png',
+                          'image/jpeg',
+                          'image/gif',
+                          'image/webp',
+                        ],
+                        onContentInserted: (content) async {
+                          final attachment = await AttachmentPicker
+                              .importKeyboardContent(content);
+                          if (attachment != null) {
+                            setSheetState(() => attachments.add(attachment));
+                          }
+                        },
+                      ),
+                  decoration: InputDecoration(
+                    hintText: 'What happened?',
+                    suffixIcon: SpeechInputButton(controller: controller),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final item = await AttachmentPicker.choose(
+                          imageOnly: true,
+                        );
+                        if (item != null) {
+                          setSheetState(() => attachments.add(item));
+                        }
+                      },
+                      icon: const Icon(Icons.image_outlined),
+                      label: const Text('Photo'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final item = await AttachmentPicker.choose();
+                        if (item != null) {
+                          setSheetState(() => attachments.add(item));
+                        }
+                      },
+                      icon: const Icon(Icons.attach_file_rounded),
+                      label: const Text('File'),
+                    ),
+                    for (final attachment in attachments)
+                      InputChip(
+                        label: Text(attachment.name),
+                        onSelected: (_) => AttachmentPicker.open(attachment),
+                        onDeleted: () => setSheetState(
+                          () => attachments.remove(attachment),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () async {
+                    await widget.lifeStore.addJournalEntry(
+                      controller.text,
+                      attachments: attachments,
+                    );
+                    if (sheetContext.mounted) Navigator.pop(sheetContext);
+                  },
+                  child: const Text('Save to Log'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.dispose();
+  }
+}
+
 class _MorePage extends StatelessWidget {
   const _MorePage({
     required this.goalStore,
@@ -1756,6 +2186,7 @@ class _MorePage extends StatelessWidget {
     required this.settings,
     required this.notificationService,
     required this.onAi,
+    required this.onLog,
     required this.onSpaces,
     required this.onSettings,
   });
@@ -1764,6 +2195,7 @@ class _MorePage extends StatelessWidget {
   final AppSettingsController settings;
   final GoalNotificationService? notificationService;
   final VoidCallback onAi;
+  final VoidCallback onLog;
   final VoidCallback onSpaces;
   final VoidCallback onSettings;
 
@@ -1782,6 +2214,12 @@ class _MorePage extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         const _GroupLabel('TOOLS'),
+        _SurfaceTile(
+          icon: Icons.history_rounded,
+          title: 'Log',
+          subtitle: 'Completion notes and your progress history',
+          onTap: onLog,
+        ),
         _SurfaceTile(
           icon: Icons.auto_awesome_outlined,
           title: 'AI',
@@ -2057,11 +2495,15 @@ class _SurfaceTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.onTap,
+    this.onLongPress,
+    this.leading,
   });
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final Widget? leading;
   @override
   Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.zero,
@@ -2069,6 +2511,7 @@ class _SurfaceTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Container(
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: context.appBorder)),
@@ -2076,7 +2519,7 @@ class _SurfaceTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 13),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: context.appMuted),
+              leading ?? Icon(icon, size: 18, color: context.appMuted),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -2212,12 +2655,14 @@ class _TaskTile extends StatelessWidget {
     this.date,
     this.onOpen,
     this.completionCheckIns = false,
+    this.finishDayOnComplete = false,
   });
   final LifeTask task;
   final LifeStore store;
   final DateTime? date;
   final VoidCallback? onOpen;
   final bool completionCheckIns;
+  final bool finishDayOnComplete;
   @override
   Widget build(BuildContext context) {
     final details = <String>[
@@ -2249,159 +2694,128 @@ class _TaskTile extends StatelessWidget {
         subtitle: details.isEmpty ? 'No date' : details.join('  ·  '),
         onTap: onOpen,
         done: date == null ? task.isCompleted : task.isDoneOn(date!),
-        onToggle: () {
+        onToggle: () async {
           final taskDate = date ?? task.dueAt ?? DateTime.now();
           final done = date == null ? task.isCompleted : task.isDoneOn(date!);
           if (done) {
             if (date == null) {
-              store.toggleTask(task);
+              await store.toggleTask(task);
             } else {
-              store.toggleTaskForDate(task, date!);
+              await store.toggleTaskForDate(task, date!);
             }
             return;
           }
-          if (completionCheckIns) {
-            store.completeTaskForDate(task, taskDate);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Task finished'),
-                action: SnackBarAction(
-                  label: 'Add progress note',
-                  onPressed: () => _showTaskCompletionCheckIn(
-                    context,
-                    store,
-                    task,
-                    taskDate,
-                  ),
-                ),
-              ),
-            );
-            return;
-          }
-          store.completeTaskForDate(task, taskDate);
+          await store.completeTaskForDate(task, taskDate);
+          await _playCompletionFeedback(finishedDay: finishDayOnComplete);
         },
       ),
     );
   }
 }
 
-Future<void> _showTaskCompletionCheckIn(
+Future<void> _showQuickTaskCapture(
   BuildContext context,
   LifeStore store,
-  LifeTask task,
-  DateTime day,
 ) async {
-  final note = TextEditingController(
-    text: task.completionNoteFor(day)?.text ?? '',
-  );
+  final controller = TextEditingController();
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (context) => Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        2,
-        20,
-        MediaQuery.viewInsetsOf(context).bottom + 22,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: context.appSoftGreen,
-                  borderRadius: BorderRadius.circular(12),
+    builder: (sheetContext) {
+      var preview = const ParsedTaskInput(title: '');
+      return StatefulBuilder(
+        builder: (context, setSheetState) => AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.fromLTRB(
+            20,
+            2,
+            20,
+            MediaQuery.viewInsetsOf(context).bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Quick task',
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-                child: Icon(Icons.check_rounded, color: context.appSuccess),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Task finished',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    Text(
-                      task.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+                const SizedBox(height: 5),
+                Text(
+                  'Type naturally, for example “Call Ahmed tomorrow at 6 PM”.',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'How did you do it?',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Optional. Keep a useful record of what worked.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            key: const Key('task-completion-note'),
-            controller: note,
-            autofocus: true,
-            minLines: 3,
-            maxLines: 6,
-            decoration: InputDecoration(
-              hintText: 'Add a progress note…',
-              suffixIcon: SpeechInputButton(controller: note),
+                const SizedBox(height: 14),
+                TextField(
+                  key: const Key('quick-task-input'),
+                  controller: controller,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  onChanged: (value) => setSheetState(
+                    () => preview = parseNaturalTask(value, DateTime.now()),
+                  ),
+                  onSubmitted: (_) =>
+                      _saveQuickTask(sheetContext, store, controller.text),
+                  decoration: InputDecoration(
+                    hintText: 'What needs doing?',
+                    suffixIcon: SpeechInputButton(controller: controller),
+                  ),
+                ),
+                if (preview.dueAt != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Scheduled ${_friendlyDate(preview.dueAt!)} · '
+                    '${TimeOfDay.fromDateTime(preview.dueAt!).format(context)}',
+                    key: const Key('quick-task-preview'),
+                    style: TextStyle(color: context.appMuted),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: () =>
+                      _saveQuickTask(sheetContext, store, controller.text),
+                  icon: const Icon(Icons.arrow_upward_rounded),
+                  label: const Text('Add task'),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    store.completeTaskForDate(task, day);
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Done without note'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () {
-                    store.completeTaskForDate(task, day, note: note.text);
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Save note'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
+        ),
+      );
+    },
   );
-  await Future<void>.delayed(const Duration(milliseconds: 300));
-  note.dispose();
+  controller.dispose();
 }
 
-Future<void> _showGoalActionCheckIn(
+Future<void> _saveQuickTask(
+  BuildContext context,
+  LifeStore store,
+  String input,
+) async {
+  final parsed = parseNaturalTask(input, DateTime.now());
+  if (parsed.title.isEmpty) return;
+  await store.addTask(title: parsed.title, dueAt: parsed.dueAt);
+  if (context.mounted) Navigator.pop(context);
+}
+
+Future<bool> _showTaskCompletionCheckIn(
+  BuildContext context,
+  LifeStore store,
+  LifeTask task,
+  DateTime day,
+) => showTaskCompletionCheckIn(context, store, task, day);
+
+Future<bool> _showGoalActionCheckIn(
   BuildContext context,
   GoalStore store,
   Goal goal,
 ) async {
   final note = TextEditingController();
-  await showModalBottomSheet<void>(
+  final completed = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -2443,9 +2857,9 @@ Future<void> _showGoalActionCheckIn(
           ),
           const SizedBox(height: 14),
           FilledButton.icon(
-            onPressed: () {
-              store.completeTodayAction(goal.id, note: note.text);
-              Navigator.pop(context);
+            onPressed: () async {
+              await store.completeTodayAction(goal.id, note: note.text);
+              if (context.mounted) Navigator.pop(context, true);
             },
             icon: const Icon(Icons.check_rounded),
             label: const Text('Complete and save'),
@@ -2456,6 +2870,17 @@ Future<void> _showGoalActionCheckIn(
   );
   await Future<void>.delayed(const Duration(milliseconds: 300));
   note.dispose();
+  return completed ?? false;
+}
+
+Future<void> _playCompletionFeedback({required bool finishedDay}) async {
+  if (finishedDay) {
+    await HapticFeedback.mediumImpact();
+    await SystemSound.play(SystemSoundType.alert);
+    return;
+  }
+  await HapticFeedback.lightImpact();
+  await SystemSound.play(SystemSoundType.click);
 }
 
 class _CalendarTile extends StatelessWidget {
@@ -2483,7 +2908,7 @@ class _CalendarTile extends StatelessWidget {
   );
 }
 
-Future<void> _showTaskEditor(
+Future<void> showTaskEditor(
   BuildContext context,
   LifeStore store,
   GoalStore goals, {
@@ -2517,6 +2942,7 @@ class _TaskEditorState extends State<_TaskEditor> {
   late TaskRepeat _repeat = widget.task?.repeat ?? TaskRepeat.none;
   late String? _goalId = widget.task?.goalId;
   late String _assignee = widget.task?.assignee ?? '';
+  late final List<LifeAttachment> _attachments = [...?widget.task?.attachments];
   bool _saving = false;
   String? _error;
   @override
@@ -2547,6 +2973,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           goalId: _goalId,
           location: _location.text,
           assignee: _assignee,
+          attachments: _attachments,
         );
       } else {
         await widget.store.updateTask(
@@ -2560,6 +2987,7 @@ class _TaskEditorState extends State<_TaskEditor> {
             clearGoal: _goalId == null,
             location: _location.text.trim(),
             assignee: _assignee,
+            attachments: _attachments,
           ),
         );
       }
@@ -2740,18 +3168,69 @@ class _TaskEditorState extends State<_TaskEditor> {
                   controller: _notes,
                   minLines: 3,
                   maxLines: 6,
+                  contentInsertionConfiguration: ContentInsertionConfiguration(
+                    allowedMimeTypes: const [
+                      'image/png',
+                      'image/jpeg',
+                      'image/gif',
+                      'image/webp',
+                    ],
+                    onContentInserted: _importInsertedContent,
+                  ),
                   decoration: InputDecoration(
                     hintText: 'Add a note…',
                     suffixIcon: SpeechInputButton(controller: _notes),
                   ),
                 ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => _pickAttachment(imageOnly: true),
+                      icon: const Icon(Icons.image_outlined, size: 18),
+                      label: const Text('Add image'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _pickAttachment(),
+                      icon: const Icon(Icons.attach_file_rounded, size: 18),
+                      label: const Text('Add file'),
+                    ),
+                  ],
+                ),
+                for (final attachment in _attachments)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () => AttachmentPicker.open(attachment),
+                    leading: Icon(
+                      attachment.kind == LifeAttachmentKind.image
+                          ? Icons.image_outlined
+                          : Icons.insert_drive_file_outlined,
+                    ),
+                    title: Text(
+                      attachment.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(_fileSize(attachment.sizeBytes)),
+                    trailing: IconButton(
+                      tooltip: 'Remove attachment',
+                      onPressed: () => setState(
+                        () => _attachments.removeWhere(
+                          (item) => item.id == attachment.id,
+                        ),
+                      ),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ),
                 if (widget.task != null &&
                     widget.task!.completionNotes.isNotEmpty) ...[
                   _label('Progress notes'),
                   for (final note in widget.task!.completionNotes)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(note.text),
+                      child: LinkText(note.text),
                     ),
                 ],
                 if (_error != null)
@@ -2774,6 +3253,36 @@ class _TaskEditorState extends State<_TaskEditor> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickAttachment({bool imageOnly = false}) async {
+    try {
+      final attachment = await AttachmentPicker.choose(imageOnly: imageOnly);
+      if (attachment != null && mounted) {
+        setState(() => _attachments.add(attachment));
+      }
+    } on PlatformException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That attachment could not be imported.')),
+      );
+    }
+  }
+
+  Future<void> _importInsertedContent(
+    KeyboardInsertedContent content,
+  ) async {
+    try {
+      final attachment = await AttachmentPicker.importKeyboardContent(content);
+      if (attachment != null && mounted) {
+        setState(() => _attachments.add(attachment));
+      }
+    } on PlatformException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That pasted image could not be saved.')),
+      );
+    }
   }
 }
 
@@ -3009,6 +3518,13 @@ String _time(DateTime date) {
       ? date.hour - 12
       : date.hour;
   return '$hour:${date.minute.toString().padLeft(2, '0')} ${date.hour >= 12 ? 'PM' : 'AM'}';
+}
+
+String _fileSize(int bytes) {
+  if (bytes <= 0) return 'Saved with task';
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
 String _weekdayName(int day) => const [

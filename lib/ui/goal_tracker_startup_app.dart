@@ -42,7 +42,7 @@ Future<GoalTrackerDependencies> createGoalTrackerDependencies() async {
     settings: settings,
     notifications: GoalNotificationService(),
     widgets: GoalWidgetService(),
-    lifeStore: LifeStore(lifeRepository),
+    lifeStore: LifeStore(lifeRepository, settings: settings.data),
   );
 }
 

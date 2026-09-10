@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../domain/speech_transcript.dart';
 import 'app_theme.dart';
 
 /// Short, deliberate dictation using the recognizer already provided by the
@@ -21,51 +22,115 @@ class SpeechInputButton extends StatefulWidget {
   State<SpeechInputButton> createState() => _SpeechInputButtonState();
 }
 
-class _SpeechInputButtonState extends State<SpeechInputButton> {
-  static final SpeechToText _speech = SpeechToText();
-  static Future<bool>? _initialization;
+class _SpeechInputButtonState extends State<SpeechInputButton>
+    with WidgetsBindingObserver {
+  final SpeechToText _speech = SpeechToText();
 
   bool _listening = false;
-  String _textBeforeListening = '';
+  bool _keepListening = false;
+  bool _restarting = false;
+  bool _preferOnDevice = true;
+  final SpeechTranscriptAccumulator _transcript =
+      SpeechTranscriptAccumulator();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed || !_keepListening) return;
+    _keepListening = false;
+    _commitCurrentSegment();
+    _speech.cancel();
+    if (mounted) setState(() => _listening = false);
+  }
 
   Future<void> _toggle() async {
     try {
       if (_listening) {
+        _keepListening = false;
         await _speech.stop();
         if (mounted) setState(() => _listening = false);
         return;
       }
 
-      _initialization ??= _speech.initialize();
-      final available = await _initialization!;
+      final available = await _speech.initialize(
+        onStatus: _onStatus,
+        onError: (_) => _finishListening(),
+      );
       if (!mounted) return;
       if (!available) {
         _showUnavailableMessage();
         return;
       }
 
-      _textBeforeListening = widget.controller.text.trim();
+      _transcript.reset(widget.controller.text);
+      _preferOnDevice = true;
+      _keepListening = true;
       setState(() => _listening = true);
-      await _speech.listen(
-        onResult: _onResult,
-        listenOptions: SpeechListenOptions(
-          listenMode: ListenMode.dictation,
-          partialResults: true,
-          cancelOnError: true,
-          onDevice: true,
-          listenFor: const Duration(seconds: 45),
-          pauseFor: const Duration(seconds: 4),
-        ),
-      );
-      if (mounted && !_speech.isListening) {
-        setState(() => _listening = false);
-      }
+      await _startSegment();
     } catch (_) {
       if (mounted) {
         setState(() => _listening = false);
         _showUnavailableMessage();
       }
     }
+  }
+
+  Future<void> _startSegment() async {
+    try {
+      await _listen(onDevice: _preferOnDevice);
+    } on Object {
+      if (!_preferOnDevice) rethrow;
+      // Not every Android speech service has an offline model installed. Keep
+      // dictation available through the system service without bundling a
+      // large model into Life Tracker.
+      _preferOnDevice = false;
+      await _listen(onDevice: false);
+    }
+  }
+
+  Future<void> _listen({required bool onDevice}) => _speech.listen(
+    onResult: _onResult,
+    listenOptions: SpeechListenOptions(
+      listenMode: ListenMode.dictation,
+      partialResults: true,
+      cancelOnError: false,
+      onDevice: onDevice,
+      listenFor: const Duration(minutes: 2),
+      pauseFor: const Duration(seconds: 5),
+    ),
+  );
+
+  void _onStatus(String status) {
+    if (!_keepListening || !mounted) return;
+    if (status != 'done' && status != 'notListening') return;
+    _commitCurrentSegment();
+    if (_restarting) return;
+    _restarting = true;
+    Future<void>.delayed(const Duration(milliseconds: 250), () async {
+      _restarting = false;
+      if (!_keepListening || !mounted || _speech.isListening) return;
+      try {
+        await _startSegment();
+      } on Object {
+        _finishListening();
+      }
+    });
+  }
+
+  void _finishListening() {
+    _keepListening = false;
+    _commitCurrentSegment();
+    if (mounted) setState(() => _listening = false);
+  }
+
+  void _commitCurrentSegment() {
+    _transcript.commitPartial();
+    _writeText(_transcript.text);
   }
 
   void _showUnavailableMessage() {
@@ -80,19 +145,24 @@ class _SpeechInputButtonState extends State<SpeechInputButton> {
 
   void _onResult(SpeechRecognitionResult result) {
     if (!mounted) return;
-    final spoken = result.recognizedWords.trim();
-    final separator = _textBeforeListening.isEmpty || spoken.isEmpty ? '' : ' ';
-    widget.controller.value = TextEditingValue(
-      text: '$_textBeforeListening$separator$spoken',
-      selection: TextSelection.collapsed(
-        offset: _textBeforeListening.length + separator.length + spoken.length,
-      ),
+    _transcript.update(
+      result.recognizedWords,
+      isFinal: result.finalResult,
     );
-    if (result.finalResult && mounted) setState(() => _listening = false);
+    _writeText(_transcript.text);
+  }
+
+  void _writeText(String text) {
+    widget.controller.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _keepListening = false;
     if (_listening) _speech.cancel();
     super.dispose();
   }

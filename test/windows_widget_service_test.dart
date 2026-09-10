@@ -19,7 +19,7 @@ void main() {
     await service.initialize();
     expect(await service.initialUri(), isNull);
     expect(await service.clicks.toList(), isEmpty);
-    await service.sync(store.goals, store, settings);
+    await service.sync(store.goals, store, null, settings);
     await service.requestPinTodayWidget();
     await service.requestPinCardsWidget();
   });

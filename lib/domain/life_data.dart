@@ -30,6 +30,7 @@ class LifeTask {
     this.location = '',
     this.spaceId = LifeSpace.personalId,
     this.assignee = '',
+    this.attachments = const [],
   });
 
   final String id;
@@ -45,6 +46,7 @@ class LifeTask {
   final String location;
   final String spaceId;
   final String assignee;
+  final List<LifeAttachment> attachments;
 
   bool get isCompleted => completedAt != null;
 
@@ -88,6 +90,7 @@ class LifeTask {
     String? location,
     String? spaceId,
     String? assignee,
+    List<LifeAttachment>? attachments,
   }) => LifeTask(
     id: id,
     title: title ?? this.title,
@@ -102,6 +105,7 @@ class LifeTask {
     location: location ?? this.location,
     spaceId: spaceId ?? this.spaceId,
     assignee: assignee ?? this.assignee,
+    attachments: attachments ?? this.attachments,
   );
 
   Map<String, Object?> toJson() => {
@@ -120,6 +124,7 @@ class LifeTask {
     'location': location,
     'spaceId': spaceId,
     'assignee': assignee,
+    'attachments': attachments.map((item) => item.toJson()).toList(),
   };
 
   factory LifeTask.fromJson(Map<String, Object?> json) => LifeTask(
@@ -145,6 +150,51 @@ class LifeTask {
     location: json['location'] as String? ?? '',
     spaceId: json['spaceId'] as String? ?? LifeSpace.personalId,
     assignee: json['assignee'] as String? ?? '',
+    attachments: (json['attachments'] as List<Object?>? ?? const [])
+        .whereType<Map>()
+        .map((item) => LifeAttachment.fromJson(Map<String, Object?>.from(item)))
+        .toList(),
+  );
+}
+
+enum LifeAttachmentKind { image, file }
+
+class LifeAttachment {
+  const LifeAttachment({
+    required this.id,
+    required this.name,
+    required this.path,
+    required this.kind,
+    this.mimeType = '',
+    this.sizeBytes = 0,
+  });
+
+  final String id;
+  final String name;
+  final String path;
+  final LifeAttachmentKind kind;
+  final String mimeType;
+  final int sizeBytes;
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'path': path,
+    'kind': kind.name,
+    'mimeType': mimeType,
+    'sizeBytes': sizeBytes,
+  };
+
+  factory LifeAttachment.fromJson(Map<String, Object?> json) => LifeAttachment(
+    id: json['id'] as String? ?? '',
+    name: json['name'] as String? ?? 'Attachment',
+    path: json['path'] as String? ?? '',
+    kind: LifeAttachmentKind.values.firstWhere(
+      (item) => item.name == json['kind'],
+      orElse: () => LifeAttachmentKind.file,
+    ),
+    mimeType: json['mimeType'] as String? ?? '',
+    sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
   );
 }
 
@@ -153,16 +203,19 @@ class TaskCompletionNote {
     required this.day,
     required this.recordedAt,
     required this.text,
+    this.attachments = const [],
   });
 
   final DateTime day;
   final DateTime recordedAt;
   final String text;
+  final List<LifeAttachment> attachments;
 
   Map<String, Object?> toJson() => {
     'day': day.toIso8601String(),
     'recordedAt': recordedAt.toIso8601String(),
     'text': text,
+    'attachments': attachments.map((item) => item.toJson()).toList(),
   };
 
   factory TaskCompletionNote.fromJson(Map<String, Object?> json) =>
@@ -170,6 +223,13 @@ class TaskCompletionNote {
         day: _date(json['day']) ?? DateTime.now(),
         recordedAt: _date(json['recordedAt']) ?? DateTime.now(),
         text: json['text'] as String? ?? '',
+        attachments: (json['attachments'] as List<Object?>? ?? const [])
+            .whereType<Map>()
+            .map(
+              (item) =>
+                  LifeAttachment.fromJson(Map<String, Object?>.from(item)),
+            )
+            .toList(),
       );
 }
 
@@ -406,6 +466,7 @@ class LifeSpace {
     required this.name,
     required this.isShared,
     this.members = const [],
+    this.profileImagePath = '',
   });
 
   static const personalId = 'personal';
@@ -415,12 +476,30 @@ class LifeSpace {
   final String name;
   final bool isShared;
   final List<SpaceMember> members;
+  final String profileImagePath;
+
+  LifeSpace copyWith({
+    String? name,
+    bool? isShared,
+    List<SpaceMember>? members,
+    String? profileImagePath,
+    bool clearProfileImage = false,
+  }) => LifeSpace(
+    id: id,
+    name: name ?? this.name,
+    isShared: isShared ?? this.isShared,
+    members: members ?? this.members,
+    profileImagePath: clearProfileImage
+        ? ''
+        : profileImagePath ?? this.profileImagePath,
+  );
 
   Map<String, Object?> toJson() => {
     'id': id,
     'name': name,
     'isShared': isShared,
     'members': members.map((member) => member.toJson()).toList(),
+    'profileImagePath': profileImagePath,
   };
 
   factory LifeSpace.fromJson(Map<String, Object?> json) => LifeSpace(
@@ -430,6 +509,59 @@ class LifeSpace {
     members: (json['members'] as List<Object?>? ?? const [])
         .whereType<Map<String, Object?>>()
         .map(SpaceMember.fromJson)
+        .toList(),
+    profileImagePath: json['profileImagePath'] as String? ?? '',
+  );
+}
+
+enum LifeLogKind { taskCompleted, progressNote, journal }
+
+class LifeLogEntry {
+  const LifeLogEntry({
+    required this.id,
+    required this.createdAt,
+    required this.kind,
+    required this.text,
+    this.taskId,
+    this.goalId,
+    this.spaceId = LifeSpace.personalId,
+    this.attachments = const [],
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final LifeLogKind kind;
+  final String text;
+  final String? taskId;
+  final String? goalId;
+  final String spaceId;
+  final List<LifeAttachment> attachments;
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'createdAt': createdAt.toIso8601String(),
+    'kind': kind.name,
+    'text': text,
+    'taskId': taskId,
+    'goalId': goalId,
+    'spaceId': spaceId,
+    'attachments': attachments.map((item) => item.toJson()).toList(),
+  };
+
+  factory LifeLogEntry.fromJson(Map<String, Object?> json) => LifeLogEntry(
+    id: json['id'] as String? ?? '',
+    createdAt: _date(json['createdAt']) ?? DateTime.now(),
+    kind: LifeLogKind.values.firstWhere(
+      (item) => item.name == json['kind'],
+      orElse: () => LifeLogKind.journal,
+    ),
+    text: json['text'] as String? ?? '',
+    taskId: json['taskId'] as String?,
+    goalId: json['goalId'] as String?,
+    spaceId: json['spaceId'] as String? ?? LifeSpace.personalId,
+    attachments: (json['attachments'] as List<Object?>? ?? const [])
+        .whereType<Map>()
+        .map((item) => LifeAttachment.fromJson(Map<String, Object?>.from(item)))
         .toList(),
   );
 }
@@ -443,6 +575,7 @@ class LifeData {
     ],
     this.activeSpaceId = LifeSpace.personalId,
     this.showBlockedTimes = true,
+    this.log = const [],
   });
 
   final List<LifeTask> tasks;
@@ -450,14 +583,32 @@ class LifeData {
   final List<LifeSpace> spaces;
   final String activeSpaceId;
   final bool showBlockedTimes;
+  final List<LifeLogEntry> log;
+
+  LifeData copyWith({
+    List<LifeTask>? tasks,
+    List<CalendarEntry>? calendar,
+    List<LifeSpace>? spaces,
+    String? activeSpaceId,
+    bool? showBlockedTimes,
+    List<LifeLogEntry>? log,
+  }) => LifeData(
+    tasks: tasks ?? this.tasks,
+    calendar: calendar ?? this.calendar,
+    spaces: spaces ?? this.spaces,
+    activeSpaceId: activeSpaceId ?? this.activeSpaceId,
+    showBlockedTimes: showBlockedTimes ?? this.showBlockedTimes,
+    log: log ?? this.log,
+  );
 
   Map<String, Object?> toJson() => {
-    'version': 2,
+    'version': 3,
     'activeSpaceId': activeSpaceId,
     'showBlockedTimes': showBlockedTimes,
     'tasks': tasks.map((task) => task.toJson()).toList(),
     'calendar': calendar.map((entry) => entry.toJson()).toList(),
     'spaces': spaces.map((space) => space.toJson()).toList(),
+    'log': log.map((entry) => entry.toJson()).toList(),
   };
 
   factory LifeData.fromJson(Map<String, Object?> json) => LifeData(
@@ -474,6 +625,10 @@ class LifeData {
     spaces: (json['spaces'] as List<Object?>? ?? const [])
         .whereType<Map<String, Object?>>()
         .map(LifeSpace.fromJson)
+        .toList(),
+    log: (json['log'] as List<Object?>? ?? const [])
+        .whereType<Map>()
+        .map((item) => LifeLogEntry.fromJson(Map<String, Object?>.from(item)))
         .toList(),
   );
 }

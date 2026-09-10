@@ -10,6 +10,31 @@ import 'package:goal_tracker_poc/domain/life_data.dart';
 import 'package:goal_tracker_poc/ui/goal_app.dart';
 
 void main() {
+  testWidgets('Today check circle completes once without forcing a note', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final goals = GoalStore(repository: MemoryGoalRepository());
+    await goals.load();
+    await goals.createQuick('Unplanned goal');
+    final tasks = LifeStore(MemoryLifeRepository());
+    await tasks.load();
+    await tasks.addTask(title: 'Daily task', dueAt: goals.today);
+
+    await tester.pumpWidget(GoalApp(store: goals, lifeStore: tasks));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('today-task-count')), findsOneWidget);
+    expect(find.text('How did you do it?'), findsNothing);
+    await tester.tap(find.byTooltip('Complete'));
+    await tester.pumpAndSettle();
+
+    expect(tasks.tasks.single.isDoneOn(goals.today), isTrue);
+    expect(find.text('How did you do it?'), findsNothing);
+    expect(find.byKey(const ValueKey('complete')), findsOneWidget);
+  });
+
   testWidgets('editing an undated task preserves its unscheduled state', (
     tester,
   ) async {

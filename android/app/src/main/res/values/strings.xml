@@ -2,4 +2,5 @@
     <string name="app_name">Goal Tracker</string>
     <string name="goal_cards_widget_description">See selected goal cards and progress.</string>
     <string name="today_widget_description">See and complete today’s goal actions.</string>
+    <string name="calendar_widget_description">See today’s calendar and protected times.</string>
 </resources>

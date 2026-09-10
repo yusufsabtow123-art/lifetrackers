@@ -51,6 +51,16 @@ class AppSettingsData {
     this.widgetCategory = '',
     this.widgetMaxCards = 3,
     this.visualStyleVersion = 0,
+    this.salahEnabled = false,
+    this.salahLatitude = 44.9537,
+    this.salahLongitude = -93.0900,
+    this.salahLocationName = 'Saint Paul, Minnesota',
+    this.salahTimeZone = 'America/Chicago',
+    this.salahCalculationMethod = 'northAmerica',
+    this.salahAsrMethod = 'shafi',
+    this.salahHighLatitudeRule = 'recommended',
+    this.salahBlockMinutes = 30,
+    this.salahAdjustments = const {},
   });
 
   final String appearance;
@@ -90,6 +100,16 @@ class AppSettingsData {
   final String widgetCategory;
   final int widgetMaxCards;
   final int visualStyleVersion;
+  final bool salahEnabled;
+  final double salahLatitude;
+  final double salahLongitude;
+  final String salahLocationName;
+  final String salahTimeZone;
+  final String salahCalculationMethod;
+  final String salahAsrMethod;
+  final String salahHighLatitudeRule;
+  final int salahBlockMinutes;
+  final Map<String, int> salahAdjustments;
 
   AppSettingsData copyWith({
     String? appearance,
@@ -129,6 +149,16 @@ class AppSettingsData {
     String? widgetCategory,
     int? widgetMaxCards,
     int? visualStyleVersion,
+    bool? salahEnabled,
+    double? salahLatitude,
+    double? salahLongitude,
+    String? salahLocationName,
+    String? salahTimeZone,
+    String? salahCalculationMethod,
+    String? salahAsrMethod,
+    String? salahHighLatitudeRule,
+    int? salahBlockMinutes,
+    Map<String, int>? salahAdjustments,
   }) => AppSettingsData(
     appearance: appearance ?? this.appearance,
     accentColor: accentColor ?? this.accentColor,
@@ -172,6 +202,17 @@ class AppSettingsData {
     widgetCategory: widgetCategory ?? this.widgetCategory,
     widgetMaxCards: widgetMaxCards ?? this.widgetMaxCards,
     visualStyleVersion: visualStyleVersion ?? this.visualStyleVersion,
+    salahEnabled: salahEnabled ?? this.salahEnabled,
+    salahLatitude: salahLatitude ?? this.salahLatitude,
+    salahLongitude: salahLongitude ?? this.salahLongitude,
+    salahLocationName: salahLocationName ?? this.salahLocationName,
+    salahTimeZone: salahTimeZone ?? this.salahTimeZone,
+    salahCalculationMethod:
+        salahCalculationMethod ?? this.salahCalculationMethod,
+    salahAsrMethod: salahAsrMethod ?? this.salahAsrMethod,
+    salahHighLatitudeRule: salahHighLatitudeRule ?? this.salahHighLatitudeRule,
+    salahBlockMinutes: salahBlockMinutes ?? this.salahBlockMinutes,
+    salahAdjustments: salahAdjustments ?? this.salahAdjustments,
   );
 
   Map<String, Object?> toJson() => {
@@ -212,6 +253,16 @@ class AppSettingsData {
     'widget_category': widgetCategory,
     'widget_max_cards': widgetMaxCards,
     'visual_style_version': visualStyleVersion,
+    'salah_enabled': salahEnabled,
+    'salah_latitude': salahLatitude,
+    'salah_longitude': salahLongitude,
+    'salah_location_name': salahLocationName,
+    'salah_time_zone': salahTimeZone,
+    'salah_calculation_method': salahCalculationMethod,
+    'salah_asr_method': salahAsrMethod,
+    'salah_high_latitude_rule': salahHighLatitudeRule,
+    'salah_block_minutes': salahBlockMinutes,
+    'salah_adjustments': salahAdjustments,
   };
 
   static AppSettingsData fromJson(Object? value) {
@@ -288,6 +339,27 @@ class AppSettingsData {
       widgetCategory: value['widget_category'] as String? ?? d.widgetCategory,
       widgetMaxCards: intOf('widget_max_cards', d.widgetMaxCards),
       visualStyleVersion: intOf('visual_style_version', d.visualStyleVersion),
+      salahEnabled: value['salah_enabled'] as bool? ?? d.salahEnabled,
+      salahLatitude:
+          (value['salah_latitude'] as num?)?.toDouble() ?? d.salahLatitude,
+      salahLongitude:
+          (value['salah_longitude'] as num?)?.toDouble() ?? d.salahLongitude,
+      salahLocationName:
+          value['salah_location_name'] as String? ?? d.salahLocationName,
+      salahTimeZone: value['salah_time_zone'] as String? ?? d.salahTimeZone,
+      salahCalculationMethod:
+          value['salah_calculation_method'] as String? ??
+          d.salahCalculationMethod,
+      salahAsrMethod: value['salah_asr_method'] as String? ?? d.salahAsrMethod,
+      salahHighLatitudeRule:
+          value['salah_high_latitude_rule'] as String? ??
+          d.salahHighLatitudeRule,
+      salahBlockMinutes: intOf('salah_block_minutes', d.salahBlockMinutes),
+      salahAdjustments:
+          (value['salah_adjustments'] as Map?)?.map(
+            (key, item) => MapEntry(key.toString(), (item as num).toInt()),
+          ) ??
+          d.salahAdjustments,
     );
   }
 }

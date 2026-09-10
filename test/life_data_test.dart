@@ -1,9 +1,75 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:goal_tracker_poc/data/app_settings_repository.dart';
 import 'package:goal_tracker_poc/app/life_store.dart';
 import 'package:goal_tracker_poc/data/life_repository.dart';
 import 'package:goal_tracker_poc/domain/life_data.dart';
 
 void main() {
+  test(
+    'Salah settings create five virtual protected blocks without duplicates',
+    () {
+      final settings = const AppSettingsData().copyWith(salahEnabled: true);
+      final store = LifeStore(MemoryLifeRepository(), settings: settings);
+      final day = DateTime(2026, 9, 10);
+
+      final first = store.entriesFor(day);
+      final second = store.entriesFor(day);
+
+      expect(first.map((entry) => entry.title), [
+        'Fajr',
+        'Dhuhr',
+        'Asr',
+        'Maghrib',
+        'Isha',
+      ]);
+      expect(
+        first.every((entry) => entry.kind == CalendarEntryKind.blockedTime),
+        isTrue,
+      );
+      expect(first.map((entry) => entry.id).toSet().length, 5);
+      expect(second.map((entry) => entry.id), first.map((entry) => entry.id));
+      expect(store.calendar, isEmpty);
+    },
+  );
+
+  test(
+    'disabling Salah removes virtual blocks without touching calendar data',
+    () {
+      final store = LifeStore(
+        MemoryLifeRepository(),
+        settings: const AppSettingsData().copyWith(salahEnabled: true),
+      );
+      expect(store.entriesFor(DateTime(2026, 9, 10)), hasLength(5));
+      store.applySettings(const AppSettingsData());
+      expect(store.entriesFor(DateTime(2026, 9, 10)), isEmpty);
+    },
+  );
+  test('Salah produces five changing protected blocks for the full year', () {
+    final store = LifeStore(
+      MemoryLifeRepository(),
+      settings: const AppSettingsData().copyWith(salahEnabled: true),
+    );
+    final ids = <String>{};
+    final fajrMinutes = <int>{};
+    for (
+      var day = DateTime(2026);
+      day.year == 2026;
+      day = day.add(const Duration(days: 1))
+    ) {
+      final entries = store.entriesFor(day);
+      expect(entries, hasLength(5), reason: '$day');
+      expect(
+        entries.every((entry) => entry.kind == CalendarEntryKind.blockedTime),
+        isTrue,
+      );
+      ids.addAll(entries.map((entry) => entry.id));
+      final fajr = entries.firstWhere((entry) => entry.title == 'Fajr').start;
+      fajrMinutes.add(fajr.hour * 60 + fajr.minute);
+    }
+    expect(ids, hasLength(365 * 5));
+    expect(fajrMinutes.length, greaterThan(30));
+  });
+
   test('repeating tasks are completed per day', () async {
     final repository = MemoryLifeRepository();
     final store = LifeStore(repository, clock: () => DateTime(2027, 1, 5, 12));
@@ -54,6 +120,16 @@ void main() {
       store.tasks.single,
       DateTime(2027, 1, 5),
       note: 'Used the short exercise first.',
+      attachments: const [
+        LifeAttachment(
+          id: 'proof-photo',
+          name: 'practice.jpg',
+          path: '/private/practice.jpg',
+          kind: LifeAttachmentKind.image,
+          mimeType: 'image/jpeg',
+          sizeBytes: 1200,
+        ),
+      ],
     );
 
     final reloaded = LifeData.fromJson(repository.data.toJson());
@@ -63,6 +139,35 @@ void main() {
       task.completionNoteFor(DateTime(2027, 1, 5))?.text,
       'Used the short exercise first.',
     );
+    expect(
+      task.completionNoteFor(DateTime(2027, 1, 5))?.attachments.single.name,
+      'practice.jpg',
+    );
+    expect(reloaded.log.single.attachments.single.id, 'proof-photo');
+  });
+
+  test('journal entries preserve rich attachments through storage', () async {
+    final repository = MemoryLifeRepository();
+    final store = LifeStore(repository, clock: () => DateTime(2027, 1, 6, 9));
+    await store.load();
+
+    await store.addJournalEntry(
+      'A useful reflection with https://example.com',
+      attachments: const [
+        LifeAttachment(
+          id: 'journal-file',
+          name: 'reflection.pdf',
+          path: '/private/reflection.pdf',
+          kind: LifeAttachmentKind.file,
+          mimeType: 'application/pdf',
+          sizeBytes: 4000,
+        ),
+      ],
+    );
+
+    final reloaded = LifeData.fromJson(repository.data.toJson());
+    expect(reloaded.log.single.text, contains('https://example.com'));
+    expect(reloaded.log.single.attachments.single.id, 'journal-file');
   });
 
   test('imports a changing blocked-time schedule', () async {

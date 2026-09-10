@@ -11,9 +11,8 @@ import '../domain/goal.dart';
 import '../domain/life_data.dart';
 import '../domain/plan_calculator.dart';
 import 'app_theme.dart';
-import 'task_completion_sheet.dart';
 
-enum _CalendarView { week, day, month }
+enum _CalendarView { schedule, day, threeDays, week, month }
 
 class LifeCalendarPage extends StatefulWidget {
   const LifeCalendarPage({
@@ -37,9 +36,12 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
   late DateTime _selected = widget.goalStore.today;
   late DateTime _month = DateTime(_selected.year, _selected.month);
   late final ScrollController _timelineController = ScrollController(
-    initialScrollOffset: 6 * _hourHeight - 16,
+    // Start early enough to reveal seasonal Fajr while retaining the complete
+    // midnight-to-midnight grid above and below.
+    initialScrollOffset: 4 * _hourHeight - 16,
   );
   _CalendarView _view = _CalendarView.week;
+  bool _mobileViewExplicit = false;
 
   @override
   void dispose() {
@@ -50,7 +52,8 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
   @override
   Widget build(BuildContext context) {
     final mobile = MediaQuery.sizeOf(context).width < 820;
-    final effectiveView = mobile && _view == _CalendarView.week
+    final effectiveView =
+        mobile && !_mobileViewExplicit && _view == _CalendarView.week
         ? _CalendarView.day
         : _view;
     return Padding(
@@ -73,12 +76,15 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
                   ),
                 ),
                 IconButton(
-                  tooltip: effectiveView == _CalendarView.day ? 'Month' : 'Day',
-                  onPressed: () => setState(
-                    () => _view = effectiveView == _CalendarView.day
-                        ? _CalendarView.month
-                        : _CalendarView.day,
-                  ),
+                  tooltip: effectiveView == _CalendarView.month
+                      ? 'Day'
+                      : 'Month',
+                  onPressed: () => setState(() {
+                    _mobileViewExplicit = true;
+                    _view = effectiveView == _CalendarView.month
+                        ? _CalendarView.day
+                        : _CalendarView.month;
+                  }),
                   icon: const Icon(Icons.calendar_today_outlined, size: 20),
                 ),
                 PopupMenuButton<String>(
@@ -97,6 +103,15 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
                       );
                     }
                     if (value == 'import') _openImport();
+                    if (value.startsWith('view:')) {
+                      final name = value.substring(5);
+                      setState(() {
+                        _mobileViewExplicit = true;
+                        _view = _CalendarView.values.firstWhere(
+                          (item) => item.name == name,
+                        );
+                      });
+                    }
                   },
                   itemBuilder: (_) => [
                     const PopupMenuItem(
@@ -115,6 +130,12 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
                       value: 'import',
                       child: Text('Import changing blocked times'),
                     ),
+                    const PopupMenuDivider(),
+                    for (final view in _CalendarView.values)
+                      PopupMenuItem(
+                        value: 'view:${view.name}',
+                        child: Text(_calendarViewLabel(view)),
+                      ),
                   ],
                   icon: const Icon(Icons.more_vert, size: 20),
                 ),
@@ -153,7 +174,9 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
                     child: switch (effectiveView) {
+                      _CalendarView.schedule => _buildScheduleView(),
                       _CalendarView.week => _buildWeekView(),
+                      _CalendarView.threeDays => _buildThreeDayView(),
                       _CalendarView.day => _buildDayView(),
                       _CalendarView.month => _buildMonthView(),
                     },
@@ -238,6 +261,38 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
     onOpenEntry: (date, entry) => _openEditor(date, entry: entry),
   );
 
+  Widget _buildThreeDayView() => _WeekSchedule(
+    key: const ValueKey('calendar-three-day-view'),
+    selected: _selected,
+    today: widget.goalStore.today,
+    goalStore: widget.goalStore,
+    lifeStore: widget.lifeStore,
+    scrollController: _timelineController,
+    hourHeight: _hourHeight,
+    dayCount: 3,
+    completionCheckIns: widget.settings?.completionCheckIns ?? true,
+    onSelect: (date) => setState(() {
+      _selected = date;
+      _month = DateTime(date.year, date.month);
+    }),
+    onAddAt: (date, start, end) =>
+        _openEditor(date, initialTime: start, initialEndTime: end),
+    onOpenEntry: (date, entry) => _openEditor(date, entry: entry),
+  );
+
+  Widget _buildScheduleView() => _ScheduleAgenda(
+    key: const ValueKey('calendar-schedule-view'),
+    start: _selected,
+    goalStore: widget.goalStore,
+    lifeStore: widget.lifeStore,
+    onOpenEntry: (date, entry) => _openEditor(date, entry: entry),
+    onSelectDay: (date) => setState(() {
+      _selected = date;
+      _month = DateTime(date.year, date.month);
+      _view = _CalendarView.day;
+    }),
+  );
+
   Widget _buildMonthView() => _MonthOverview(
     key: const ValueKey('calendar-month-view'),
     month: _month,
@@ -264,19 +319,22 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
     CalendarEntry? entry,
     TimeOfDay? initialTime,
     TimeOfDay? initialEndTime,
-  }) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (_) => _CalendarEditorSheet(
-      store: widget.lifeStore,
-      initialDate: date,
-      entry: entry,
-      initialTime: initialTime,
-      initialEndTime: initialEndTime,
-    ),
-  );
+  }) {
+    if (entry?.id.startsWith('salah-') ?? false) return Future.value();
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => _CalendarEditorSheet(
+        store: widget.lifeStore,
+        initialDate: date,
+        entry: entry,
+        initialTime: initialTime,
+        initialEndTime: initialEndTime,
+      ),
+    );
+  }
 
   Future<void> _openImport() => showModalBottomSheet<void>(
     context: context,
@@ -372,16 +430,28 @@ class _ViewSelector extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         _ViewButton(
-          label: 'Week',
-          icon: Icons.calendar_view_week_outlined,
-          selected: value == _CalendarView.week,
-          onTap: () => onChanged(_CalendarView.week),
+          label: 'Schedule',
+          icon: Icons.view_agenda_outlined,
+          selected: value == _CalendarView.schedule,
+          onTap: () => onChanged(_CalendarView.schedule),
         ),
         _ViewButton(
           label: 'Day',
           icon: Icons.view_day_outlined,
           selected: value == _CalendarView.day,
           onTap: () => onChanged(_CalendarView.day),
+        ),
+        _ViewButton(
+          label: '3 days',
+          icon: Icons.view_week_outlined,
+          selected: value == _CalendarView.threeDays,
+          onTap: () => onChanged(_CalendarView.threeDays),
+        ),
+        _ViewButton(
+          label: 'Week',
+          icon: Icons.calendar_view_week_outlined,
+          selected: value == _CalendarView.week,
+          onTap: () => onChanged(_CalendarView.week),
         ),
         _ViewButton(
           label: 'Month',
@@ -631,6 +701,110 @@ class _WeekDay extends StatelessWidget {
   }
 }
 
+class _ScheduleAgenda extends StatelessWidget {
+  const _ScheduleAgenda({
+    super.key,
+    required this.start,
+    required this.goalStore,
+    required this.lifeStore,
+    required this.onOpenEntry,
+    required this.onSelectDay,
+  });
+
+  final DateTime start;
+  final GoalStore goalStore;
+  final LifeStore lifeStore;
+  final void Function(DateTime, CalendarEntry) onOpenEntry;
+  final ValueChanged<DateTime> onSelectDay;
+
+  @override
+  Widget build(BuildContext context) => ListView.builder(
+    padding: const EdgeInsets.only(bottom: 88),
+    itemCount: 45,
+    itemBuilder: (context, index) {
+      final day = _dateOnly(start.add(Duration(days: index)));
+      final entries = lifeStore.entriesFor(day);
+      final tasks = lifeStore.tasksFor(day);
+      final goals = _goalActions(goalStore, day);
+      if (entries.isEmpty && tasks.isEmpty && goals.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      return Semantics(
+        header: true,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkWell(
+                onTap: () => onSelectDay(day),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    _friendlyDate(day),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: context.appPanel,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: context.appBorder),
+                ),
+                child: Column(
+                  children: [
+                    for (final entry in entries)
+                      ListTile(
+                        leading: Container(
+                          width: 4,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: _calendarEntryColor(context, entry),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        title: Text(entry.title),
+                        subtitle: Text(
+                          '${TimeOfDay.fromDateTime(entry.occurrenceStart(day)).format(context)} – '
+                          '${TimeOfDay.fromDateTime(entry.occurrenceEnd(day)).format(context)}',
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: entry.id.startsWith('salah-')
+                            ? null
+                            : () => onOpenEntry(day, entry),
+                      ),
+                    for (final task in tasks)
+                      ListTile(
+                        leading: Icon(
+                          task.isDoneOn(day)
+                              ? Icons.check_circle_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          color: task.isDoneOn(day) ? context.appSuccess : null,
+                        ),
+                        title: Text(task.title),
+                        subtitle: const Text('Task'),
+                        onTap: () => lifeStore.toggleTaskForDate(task, day),
+                      ),
+                    for (final action in goals)
+                      ListTile(
+                        leading: const Icon(Icons.flag_outlined),
+                        title: Text(action.goal.name),
+                        subtitle: Text(
+                          '${formatAmount(action.amount)} ${action.goal.plan!.unit}',
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
 class _WeekSchedule extends StatelessWidget {
   const _WeekSchedule({
     super.key,
@@ -644,6 +818,7 @@ class _WeekSchedule extends StatelessWidget {
     required this.onSelect,
     required this.onAddAt,
     required this.onOpenEntry,
+    this.dayCount = 7,
   });
 
   final DateTime selected;
@@ -656,14 +831,15 @@ class _WeekSchedule extends StatelessWidget {
   final ValueChanged<DateTime> onSelect;
   final void Function(DateTime date, TimeOfDay start, TimeOfDay end) onAddAt;
   final void Function(DateTime date, CalendarEntry entry) onOpenEntry;
+  final int dayCount;
 
   @override
   Widget build(BuildContext context) {
-    final weekStart = _dateOnly(
-      selected.subtract(Duration(days: selected.weekday - 1)),
-    );
+    final weekStart = dayCount == 7
+        ? _dateOnly(selected.subtract(Duration(days: selected.weekday - 1)))
+        : _dateOnly(selected);
     final days = List.generate(
-      7,
+      dayCount,
       (index) => weekStart.add(Duration(days: index)),
     );
     return Container(
@@ -682,9 +858,9 @@ class _WeekSchedule extends StatelessWidget {
                 SizedBox(
                   width: 56,
                   child: IconButton(
-                    tooltip: 'Previous week',
+                    tooltip: 'Previous $dayCount days',
                     onPressed: () =>
-                        onSelect(selected.subtract(const Duration(days: 7))),
+                        onSelect(selected.subtract(Duration(days: dayCount))),
                     icon: const Icon(Icons.chevron_left_rounded, size: 19),
                   ),
                 ),
@@ -746,9 +922,9 @@ class _WeekSchedule extends StatelessWidget {
                 SizedBox(
                   width: 40,
                   child: IconButton(
-                    tooltip: 'Next week',
+                    tooltip: 'Next $dayCount days',
                     onPressed: () =>
-                        onSelect(selected.add(const Duration(days: 7))),
+                        onSelect(selected.add(Duration(days: dayCount))),
                     icon: const Icon(Icons.chevron_right_rounded, size: 19),
                   ),
                 ),
@@ -909,13 +1085,6 @@ class _CalendarDaySummary extends StatelessWidget {
                           onTap: () async {
                             if (task.isDoneOn(date)) {
                               await lifeStore.toggleTaskForDate(task, date);
-                            } else if (completionCheckIns) {
-                              await showTaskCompletionCheckIn(
-                                context,
-                                lifeStore,
-                                task,
-                                date,
-                              );
                             } else {
                               await lifeStore.completeTaskForDate(task, date);
                             }
@@ -1127,23 +1296,6 @@ class _AllDayStrip extends StatelessWidget {
                             onTap: () {
                               if (task.isDoneOn(date)) {
                                 lifeStore.toggleTaskForDate(task, date);
-                              } else if (completionCheckIns) {
-                                lifeStore.completeTaskForDate(task, date);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Task finished'),
-                                    action: SnackBarAction(
-                                      label: 'Add progress note',
-                                      onPressed: () =>
-                                          showTaskCompletionCheckIn(
-                                            context,
-                                            lifeStore,
-                                            task,
-                                            date,
-                                          ),
-                                    ),
-                                  ),
-                                );
                               } else {
                                 lifeStore.completeTaskForDate(task, date);
                               }
@@ -1602,6 +1754,13 @@ class _MonthDayCell extends StatelessWidget {
       if (hasTask) const Color(0xFF55C891),
       ...entries.map((entry) => _calendarEntryColor(context, entry)),
     ];
+    final itemCount = (hasGoal ? 1 : 0) + (hasTask ? 1 : 0) + entries.length;
+    final occupiedMinutes = entries.fold<int>(0, (total, entry) {
+      final start = entry.occurrenceStart(date);
+      final end = entry.occurrenceEnd(date);
+      return total + math.max(0, end.difference(start).inMinutes);
+    });
+    final density = (occupiedMinutes / (12 * 60)).clamp(0.0, 1.0);
     return Padding(
       padding: const EdgeInsets.all(2),
       child: InkWell(
@@ -1612,7 +1771,7 @@ class _MonthDayCell extends StatelessWidget {
           decoration: BoxDecoration(
             color: active
                 ? Theme.of(context).colorScheme.primary.withValues(alpha: .18)
-                : Colors.transparent,
+                : context.appRaised.withValues(alpha: .05 + density * .16),
             borderRadius: BorderRadius.circular(7),
             border: active
                 ? Border.all(
@@ -1625,28 +1784,58 @@ class _MonthDayCell extends StatelessWidget {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              Text(
-                '${date.day}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: active ? FontWeight.w800 : FontWeight.w500,
-                  color: muted ? context.appMuted.withValues(alpha: .45) : null,
+              Positioned(
+                top: 5,
+                left: 0,
+                right: 0,
+                child: Text(
+                  '${date.day}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+                    color: muted
+                        ? context.appMuted.withValues(alpha: .45)
+                        : null,
+                  ),
                 ),
               ),
-              if (colors.isNotEmpty)
+              if (itemCount > 0)
                 Positioned(
-                  bottom: 4,
-                  child: Row(
+                  left: 4,
+                  right: 4,
+                  bottom: 3,
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      for (final color in colors.take(3))
-                        Container(
-                          width: 4,
-                          height: 4,
-                          margin: const EdgeInsets.symmetric(horizontal: 1),
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
+                      Text(
+                        '$itemCount',
+                        semanticsLabel: '$itemCount scheduled items',
+                        style: TextStyle(
+                          fontSize: 9,
+                          height: 1,
+                          color: muted ? context.appMuted : context.appText,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: Row(
+                          children: [
+                            for (final color in colors.take(3))
+                              Expanded(
+                                child: Container(height: 3, color: color),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (colors.length > 3)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1),
+                          child: Container(
+                            height: 1,
+                            color: context.appMuted.withValues(alpha: .6),
                           ),
                         ),
                     ],
@@ -2614,63 +2803,63 @@ class _ScheduleImportSheetState extends State<_ScheduleImportSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => FractionallySizedBox(
-    heightFactor: .82,
-    child: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            2,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom + 18,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Import changing blocked times',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 7),
-              Text(
-                'Choose a schedule file or paste rows. Tab-separated columns are date, start, end, name, location, color, repeat, and kind. Existing matching rows are skipped.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: context.appMuted),
-              ),
-              const SizedBox(height: 14),
-              OutlinedButton.icon(
-                onPressed: _saving ? null : _chooseFile,
-                icon: const Icon(Icons.upload_file_rounded),
-                label: Text(
-                  _selectedFileName == null
-                      ? 'Choose schedule file'
-                      : 'Selected: $_selectedFileName',
+  Widget build(BuildContext context) => AnimatedPadding(
+    duration: const Duration(milliseconds: 180),
+    curve: Curves.easeOut,
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: FractionallySizedBox(
+      heightFactor: MediaQuery.viewInsetsOf(context).bottom > 0 ? .98 : .82,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 620),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 2, 20, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Import changing blocked times',
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  autofocus: true,
-                  expands: true,
-                  minLines: null,
-                  maxLines: null,
-                  textAlignVertical: TextAlignVertical.top,
-                  decoration: const InputDecoration(
-                    hintText:
-                        '2027-01-01\t5:45 AM\t6:15 AM\tFajr\tSaint Paul, MN\tgreen\tnone\tblockedTime',
+                const SizedBox(height: 7),
+                Text(
+                  'Choose a schedule file or paste rows. Tab-separated columns are date, start, end, name, location, color, repeat, and kind. Existing matching rows are skipped.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: context.appMuted),
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: _saving ? null : _chooseFile,
+                  icon: const Icon(Icons.upload_file_rounded),
+                  label: Text(
+                    _selectedFileName == null
+                        ? 'Choose schedule file'
+                        : 'Selected: $_selectedFileName',
                   ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              FilledButton(
-                onPressed: _saving ? null : _import,
-                child: Text(_saving ? 'Importing…' : 'Import schedule'),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    autofocus: true,
+                    expands: true,
+                    minLines: null,
+                    maxLines: null,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: const InputDecoration(
+                      hintText:
+                          '2027-01-01\t5:45 AM\t6:15 AM\tFajr\tSaint Paul, MN\tgreen\tnone\tblockedTime',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FilledButton(
+                  onPressed: _saving ? null : _import,
+                  child: Text(_saving ? 'Importing…' : 'Import schedule'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2678,12 +2867,23 @@ class _ScheduleImportSheetState extends State<_ScheduleImportSheet> {
   );
 
   Future<void> _chooseFile() async {
-    if (!Platform.isWindows) {
-      _showFileError('File selection is currently available on Windows.');
-      return;
-    }
     try {
       const channel = MethodChannel('life_tracker/files');
+      if (Platform.isAndroid) {
+        final selected = await channel.invokeMapMethod<String, Object?>(
+          'chooseScheduleText',
+        );
+        if (selected == null || !mounted) return;
+        setState(() {
+          _selectedFileName = selected['name'] as String? ?? 'schedule';
+          _controller.text = selected['text'] as String? ?? '';
+        });
+        return;
+      }
+      if (!Platform.isWindows) {
+        _showFileError('Use paste import on this platform.');
+        return;
+      }
       final path = await channel.invokeMethod<String>('chooseScheduleFile');
       if (path == null || path.isEmpty || !mounted) return;
       final file = File(path);
@@ -2845,6 +3045,14 @@ DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
 
 bool _sameDate(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
+
+String _calendarViewLabel(_CalendarView view) => switch (view) {
+  _CalendarView.schedule => 'Schedule',
+  _CalendarView.day => 'Day',
+  _CalendarView.threeDays => '3 days',
+  _CalendarView.week => 'Week',
+  _CalendarView.month => 'Month',
+};
 
 String _weekdayLetter(int weekday) =>
     const ['M', 'T', 'W', 'T', 'F', 'S', 'S'][weekday - 1];

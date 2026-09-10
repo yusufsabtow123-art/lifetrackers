@@ -160,6 +160,50 @@ enum WidgetGoalScope {
       );
 }
 
+enum SalahCalculationMethod {
+  northAmerica('ISNA · North America'),
+  muslimWorldLeague('Muslim World League'),
+  egyptian('Egyptian General Authority'),
+  karachi('University of Islamic Sciences, Karachi'),
+  ummAlQura('Umm al-Qura University, Makkah');
+
+  const SalahCalculationMethod(this.label);
+  final String label;
+  static SalahCalculationMethod parse(String? value) =>
+      SalahCalculationMethod.values.firstWhere(
+        (item) => item.name == value,
+        orElse: () => SalahCalculationMethod.northAmerica,
+      );
+}
+
+enum SalahAsrMethod {
+  shafi('Standard · Shafi‘i, Maliki, Hanbali'),
+  hanafi('Hanafi');
+
+  const SalahAsrMethod(this.label);
+  final String label;
+  static SalahAsrMethod parse(String? value) =>
+      SalahAsrMethod.values.firstWhere(
+        (item) => item.name == value,
+        orElse: () => SalahAsrMethod.shafi,
+      );
+}
+
+enum SalahHighLatitudeRule {
+  recommended('Recommended for this location'),
+  middleOfNight('Middle of the night'),
+  seventhOfNight('Seventh of the night'),
+  twilightAngle('Twilight angle');
+
+  const SalahHighLatitudeRule(this.label);
+  final String label;
+  static SalahHighLatitudeRule parse(String? value) =>
+      SalahHighLatitudeRule.values.firstWhere(
+        (item) => item.name == value,
+        orElse: () => SalahHighLatitudeRule.recommended,
+      );
+}
+
 class AppSettingsController extends ChangeNotifier {
   AppSettingsController(this.repository);
   factory AppSettingsController.memory() =>
@@ -200,6 +244,13 @@ class AppSettingsController extends ChangeNotifier {
   bool get widgetShowProgress => _settings.widgetShowProgress;
   int get widgetMaxCards => _settings.widgetMaxCards;
   String get widgetCategory => _settings.widgetCategory;
+  bool get salahEnabled => _settings.salahEnabled;
+  SalahCalculationMethod get salahCalculationMethod =>
+      SalahCalculationMethod.parse(_settings.salahCalculationMethod);
+  SalahAsrMethod get salahAsrMethod =>
+      SalahAsrMethod.parse(_settings.salahAsrMethod);
+  SalahHighLatitudeRule get salahHighLatitudeRule =>
+      SalahHighLatitudeRule.parse(_settings.salahHighLatitudeRule);
   TimeOfDay get defaultReminderTime => TimeOfDay(
     hour: _settings.defaultReminderHour,
     minute: _settings.defaultReminderMinute,
@@ -355,4 +406,37 @@ class AppSettingsController extends ChangeNotifier {
       _commit(_settings.copyWith(widgetCategory: value));
   Future<void> setWidgetMaxCards(int value) =>
       _commit(_settings.copyWith(widgetMaxCards: value.clamp(1, 8)));
+  Future<void> setSalahEnabled(bool value) =>
+      _commit(_settings.copyWith(salahEnabled: value));
+  Future<void> setSalahCalculationMethod(SalahCalculationMethod value) =>
+      _commit(_settings.copyWith(salahCalculationMethod: value.name));
+  Future<void> setSalahAsrMethod(SalahAsrMethod value) =>
+      _commit(_settings.copyWith(salahAsrMethod: value.name));
+  Future<void> setSalahHighLatitudeRule(SalahHighLatitudeRule value) =>
+      _commit(_settings.copyWith(salahHighLatitudeRule: value.name));
+  Future<void> setSalahAdjustment(String prayer, int minutes) {
+    final adjustments = Map<String, int>.of(_settings.salahAdjustments);
+    if (minutes == 0) {
+      adjustments.remove(prayer);
+    } else {
+      adjustments[prayer] = minutes.clamp(-30, 30);
+    }
+    return _commit(_settings.copyWith(salahAdjustments: adjustments));
+  }
+
+  Future<void> setSalahBlockMinutes(int value) =>
+      _commit(_settings.copyWith(salahBlockMinutes: value.clamp(10, 120)));
+  Future<void> setSalahManualLocation({
+    required String name,
+    required double latitude,
+    required double longitude,
+    required String timeZone,
+  }) => _commit(
+    _settings.copyWith(
+      salahLocationName: name,
+      salahLatitude: latitude,
+      salahLongitude: longitude,
+      salahTimeZone: timeZone,
+    ),
+  );
 }

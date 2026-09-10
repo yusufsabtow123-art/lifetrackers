@@ -2,7 +2,7 @@
 # See https://dart.dev/tools/pub/glossary#lockfile
 packages:
   adhan:
-    dependency: "direct dev"
+    dependency: "direct main"
     description:
       name: adhan
       sha256: e1d3363c8127dc614947ecf312e458fbf4783af3db8e3b465c4a286eb37374ac

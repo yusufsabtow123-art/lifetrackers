@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:goal_tracker_poc/app/goal_store.dart';
+import 'package:goal_tracker_poc/app/life_store.dart';
 import 'package:goal_tracker_poc/app/theme_controller.dart';
 import 'package:goal_tracker_poc/data/app_settings_repository.dart';
 import 'package:goal_tracker_poc/data/goal_repository.dart';
@@ -69,6 +70,7 @@ class _FailingWidgetService extends GoalWidgetService {
   Future<void> sync(
     Iterable<Goal> goals,
     GoalStore store,
+    LifeStore? lifeStore,
     AppSettingsController settings,
   ) async {}
 }
