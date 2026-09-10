@@ -44,6 +44,58 @@ void main() {
       expect(store.entriesFor(DateTime(2026, 9, 10)), isEmpty);
     },
   );
+
+  test(
+    'Salah stays visible when custom blocks are hidden and follows the active space',
+    () async {
+      final day = DateTime(2026, 9, 10);
+      final repository = MemoryLifeRepository(
+        LifeData(
+          spaces: const [
+            LifeSpace(
+              id: LifeSpace.personalId,
+              name: 'Personal',
+              isShared: false,
+            ),
+            LifeSpace(id: 'family', name: 'Family', isShared: true),
+          ],
+          activeSpaceId: 'family',
+          showBlockedTimes: false,
+          calendar: [
+            CalendarEntry(
+              id: 'hidden-custom-block',
+              title: 'Private block',
+              start: DateTime(2026, 9, 10, 9),
+              end: DateTime(2026, 9, 10, 10),
+              kind: CalendarEntryKind.blockedTime,
+              spaceId: 'family',
+            ),
+          ],
+        ),
+      );
+      final store = LifeStore(
+        repository,
+        settings: const AppSettingsData().copyWith(salahEnabled: true),
+      );
+      await store.load();
+
+      final entries = store.entriesFor(day);
+
+      expect(entries.map((entry) => entry.title), [
+        'Fajr',
+        'Dhuhr',
+        'Asr',
+        'Maghrib',
+        'Isha',
+      ]);
+      expect(entries.every((entry) => entry.spaceId == 'family'), isTrue);
+      expect(
+        entries.any((entry) => entry.id == 'hidden-custom-block'),
+        isFalse,
+      );
+    },
+  );
+
   test('Salah produces five changing protected blocks for the full year', () {
     final store = LifeStore(
       MemoryLifeRepository(),

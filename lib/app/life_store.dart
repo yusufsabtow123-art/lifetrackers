@@ -51,15 +51,21 @@ class LifeStore extends ChangeNotifier {
       .toList(growable: false);
 
   List<CalendarEntry> entriesFor(DateTime day) =>
-      [..._data.calendar, ..._salahSchedule.entriesFor(day, _settings)]
-          .where(
-            (entry) =>
-                entry.spaceId == activeSpaceId &&
+      [
+            ..._data.calendar,
+            ..._salahSchedule
+                .entriesFor(day, _settings)
+                .map((entry) => entry.copyWith(spaceId: activeSpaceId)),
+          ]
+          .where((entry) {
+            final generatedSalah = entry.id.startsWith('salah-');
+            return entry.spaceId == activeSpaceId &&
                 entry.enabled &&
-                (_data.showBlockedTimes ||
+                (generatedSalah ||
+                    _data.showBlockedTimes ||
                     entry.kind != CalendarEntryKind.blockedTime) &&
-                entry.occursOn(day),
-          )
+                entry.occursOn(day);
+          })
           .toList(growable: false)
         ..sort(
           (a, b) => a.occurrenceStart(day).compareTo(b.occurrenceStart(day)),

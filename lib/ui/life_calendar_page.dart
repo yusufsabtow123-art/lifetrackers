@@ -122,7 +122,11 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
                       value: 'blocks',
                       child: Text(
                         widget.lifeStore.data.showBlockedTimes
-                            ? 'Hide blocked times'
+                            ? widget.settings?.salahEnabled == true
+                                  ? 'Hide other blocked times'
+                                  : 'Hide blocked times'
+                            : widget.settings?.salahEnabled == true
+                            ? 'Show other blocked times'
                             : 'Show blocked times',
                       ),
                     ),
@@ -163,7 +167,12 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
                   onChanged: (v) => setState(() => _view = v),
                 ),
                 const SizedBox(width: 8),
-                Expanded(child: _BlockedTimesControl(store: widget.lifeStore)),
+                Expanded(
+                  child: _BlockedTimesControl(
+                    store: widget.lifeStore,
+                    salahEnabled: widget.settings?.salahEnabled == true,
+                  ),
+                ),
               ],
             ),
           const SizedBox(height: 10),
@@ -507,8 +516,9 @@ class _ViewButton extends StatelessWidget {
 }
 
 class _BlockedTimesControl extends StatelessWidget {
-  const _BlockedTimesControl({required this.store});
+  const _BlockedTimesControl({required this.store, required this.salahEnabled});
   final LifeStore store;
+  final bool salahEnabled;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -525,7 +535,13 @@ class _BlockedTimesControl extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            store.data.showBlockedTimes ? 'Blocked times' : 'Blocks hidden',
+            store.data.showBlockedTimes
+                ? salahEnabled
+                      ? 'Other blocked times'
+                      : 'Blocked times'
+                : salahEnabled
+                ? 'Other blocks hidden'
+                : 'Blocks hidden',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),

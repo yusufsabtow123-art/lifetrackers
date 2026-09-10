@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:goal_tracker_poc/app/goal_store.dart';
 import 'package:goal_tracker_poc/app/life_store.dart';
+import 'package:goal_tracker_poc/app/theme_controller.dart';
+import 'package:goal_tracker_poc/data/app_settings_repository.dart';
 import 'package:goal_tracker_poc/data/goal_repository.dart';
 import 'package:goal_tracker_poc/data/life_repository.dart';
 import 'package:goal_tracker_poc/domain/goal.dart';
@@ -10,6 +12,41 @@ import 'package:goal_tracker_poc/domain/life_data.dart';
 import 'package:goal_tracker_poc/ui/goal_app.dart';
 
 void main() {
+  testWidgets('enabling Salah makes prayer blocks visible in Calendar', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final goals = GoalStore(repository: MemoryGoalRepository());
+    await goals.load();
+    await goals.createQuick('Keep the real shell loaded');
+    final lifeStore = LifeStore(
+      MemoryLifeRepository(const LifeData(showBlockedTimes: false)),
+      clock: () => DateTime(2026, 9, 10, 12),
+    );
+    await lifeStore.load();
+    final settings = AppSettingsController(MemoryAppSettingsRepository());
+    await settings.load();
+
+    await tester.pumpWidget(
+      GoalApp(store: goals, lifeStore: lifeStore, settingsController: settings),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('More').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Calendar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('salah-calendar-enabled')));
+    await tester.pumpAndSettle();
+
+    expect(settings.salahEnabled, isTrue);
+    expect(lifeStore.data.showBlockedTimes, isTrue);
+    expect(lifeStore.entriesFor(DateTime(2026, 9, 10)), hasLength(5));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Today check circle completes once without forcing a note', (
     tester,
   ) async {
@@ -232,10 +269,7 @@ void main() {
     expect(find.text('In progress'), findsOneWidget);
     expect(find.text('Paused'), findsOneWidget);
     expect(find.text('Finished'), findsOneWidget);
-    expect(
-      find.byKey(const Key('simplified-new-goal-button')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('simplified-new-goal-button')), findsOneWidget);
     expect(find.text('Move what matters forward.'), findsOneWidget);
     expect(find.text('Add a plan'), findsNothing);
     expect(find.byKey(const Key('mobile-goal-board')), findsNothing);

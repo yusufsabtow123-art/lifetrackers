@@ -824,6 +824,7 @@ void main() {
     await tester.tap(find.byKey(const Key('salah-calendar-enabled')));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+    expect(settings.salahEnabled, isTrue);
     expect(find.text('ISNA · North America'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();

@@ -37,7 +37,11 @@ class SettingsPage extends StatelessWidget {
         'Calendar and Salah',
         'Protected prayer times, location, calculation, and block duration.',
         Icons.calendar_month_outlined,
-        () => _open(context, 'Calendar and Salah', _CalendarSettings(settings)),
+        () => _open(
+          context,
+          'Calendar and Salah',
+          _CalendarSettings(settings, lifeStore),
+        ),
       ),
       _SettingsEntry(
         'Board and categories',
@@ -719,8 +723,9 @@ class _OpenedGoalSettings extends StatelessWidget {
 }
 
 class _CalendarSettings extends StatelessWidget {
-  const _CalendarSettings(this.settings);
+  const _CalendarSettings(this.settings, this.lifeStore);
   final AppSettingsController settings;
+  final LifeStore? lifeStore;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -735,7 +740,10 @@ class _CalendarSettings extends StatelessWidget {
             'Show Fajr, Dhuhr, Asr, Maghrib, and Isha as protected calendar blocks.',
           ),
           value: settings.salahEnabled,
-          onChanged: settings.setSalahEnabled,
+          onChanged: (value) {
+            if (value) lifeStore?.setShowBlockedTimes(true);
+            settings.setSalahEnabled(value);
+          },
         ),
         ListTile(
           enabled: settings.salahEnabled,
