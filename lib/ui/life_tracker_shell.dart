@@ -22,6 +22,7 @@ import 'link_text.dart';
 import 'settings_page.dart';
 import 'speech_input_button.dart';
 import 'task_completion_sheet.dart';
+import 'task_completion_page.dart';
 
 enum _Destination { today, goals, tasks, calendar, log, spaces, ai, more }
 
@@ -588,6 +589,8 @@ class TodayPage extends StatelessWidget {
                   date: today,
                   onOpen: () =>
                       showTaskEditor(context, lifeStore, goalStore, task: task),
+                  onCompletionOpen: () =>
+                      showTaskCompletionRecord(context, lifeStore, task, today),
                 ),
             ],
           ),
@@ -625,7 +628,9 @@ class TodayPage extends StatelessWidget {
                       goals.first.goal,
                     );
                     if (completed) {
-                      await _playCompletionFeedback(finishedDay: remaining == 1);
+                      await _playCompletionFeedback(
+                        finishedDay: remaining == 1,
+                      );
                     }
                   }
                 : () async {
@@ -636,7 +641,9 @@ class TodayPage extends StatelessWidget {
                       today,
                     );
                     if (completed) {
-                      await _playCompletionFeedback(finishedDay: remaining == 1);
+                      await _playCompletionFeedback(
+                        finishedDay: remaining == 1,
+                      );
                     }
                   },
           ),
@@ -1109,6 +1116,14 @@ class _TasksPageState extends State<TasksPage> {
                                 widget.lifeStore,
                                 widget.goalStore,
                                 task: task,
+                              ),
+                              onCompletionOpen: () => showTaskCompletionRecord(
+                                context,
+                                widget.lifeStore,
+                                task,
+                                _filter == 0
+                                    ? now
+                                    : task.completedAt ?? task.dueAt ?? now,
                               ),
                             ),
                       ],
@@ -1886,8 +1901,10 @@ class _LogPageState extends State<LogPage> {
         'journal' => entry.kind == LifeLogKind.journal,
         _ => true,
       };
-      final haystack = '${entry.text} ${task?.title ?? ''} '
-          '${goal?.name ?? ''}'.toLowerCase();
+      final haystack =
+          '${entry.text} ${task?.title ?? ''} '
+                  '${goal?.name ?? ''}'
+              .toLowerCase();
       return matchesFilter &&
           (_query.isEmpty || haystack.contains(_query.toLowerCase()));
     }).toList();
@@ -2100,22 +2117,21 @@ class _LogPageState extends State<LogPage> {
                   autofocus: true,
                   minLines: 4,
                   maxLines: 10,
-                  contentInsertionConfiguration:
-                      ContentInsertionConfiguration(
-                        allowedMimeTypes: const [
-                          'image/png',
-                          'image/jpeg',
-                          'image/gif',
-                          'image/webp',
-                        ],
-                        onContentInserted: (content) async {
-                          final attachment = await AttachmentPicker
-                              .importKeyboardContent(content);
-                          if (attachment != null) {
-                            setSheetState(() => attachments.add(attachment));
-                          }
-                        },
-                      ),
+                  contentInsertionConfiguration: ContentInsertionConfiguration(
+                    allowedMimeTypes: const [
+                      'image/png',
+                      'image/jpeg',
+                      'image/gif',
+                      'image/webp',
+                    ],
+                    onContentInserted: (content) async {
+                      final attachment =
+                          await AttachmentPicker.importKeyboardContent(content);
+                      if (attachment != null) {
+                        setSheetState(() => attachments.add(attachment));
+                      }
+                    },
+                  ),
                   decoration: InputDecoration(
                     hintText: 'What happened?',
                     suffixIcon: SpeechInputButton(controller: controller),
@@ -2152,9 +2168,8 @@ class _LogPageState extends State<LogPage> {
                       InputChip(
                         label: Text(attachment.name),
                         onSelected: (_) => AttachmentPicker.open(attachment),
-                        onDeleted: () => setSheetState(
-                          () => attachments.remove(attachment),
-                        ),
+                        onDeleted: () =>
+                            setSheetState(() => attachments.remove(attachment)),
                       ),
                   ],
                 ),
@@ -2558,6 +2573,7 @@ class _ActionTile extends StatelessWidget {
     required this.done,
     this.onToggle,
     this.onTap,
+    this.onDetails,
   });
   final IconData icon;
   final String title;
@@ -2565,6 +2581,7 @@ class _ActionTile extends StatelessWidget {
   final bool done;
   final VoidCallback? onToggle;
   final VoidCallback? onTap;
+  final VoidCallback? onDetails;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 6),
@@ -2631,12 +2648,14 @@ class _ActionTile extends StatelessWidget {
                   ),
                 ),
               ),
-              if (onTap != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Icon(
+              if (onTap != null || onDetails != null)
+                IconButton(
+                  tooltip: onDetails == null ? 'Open' : 'Completion details',
+                  onPressed: onDetails ?? onTap,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
                     Icons.chevron_right,
-                    size: 17,
+                    size: 20,
                     color: context.appMuted,
                   ),
                 ),
@@ -2654,6 +2673,7 @@ class _TaskTile extends StatelessWidget {
     required this.store,
     this.date,
     this.onOpen,
+    this.onCompletionOpen,
     this.completionCheckIns = false,
     this.finishDayOnComplete = false,
   });
@@ -2661,6 +2681,7 @@ class _TaskTile extends StatelessWidget {
   final LifeStore store;
   final DateTime? date;
   final VoidCallback? onOpen;
+  final VoidCallback? onCompletionOpen;
   final bool completionCheckIns;
   final bool finishDayOnComplete;
   @override
@@ -2672,6 +2693,7 @@ class _TaskTile extends StatelessWidget {
       if (task.location.isNotEmpty) task.location,
       if (task.assignee.isNotEmpty) 'Assigned to ${task.assignee}',
     ];
+    final done = date == null ? task.isCompleted : task.isDoneOn(date!);
     return Dismissible(
       key: ValueKey(task.id),
       direction: DismissDirection.endToStart,
@@ -2693,7 +2715,8 @@ class _TaskTile extends StatelessWidget {
         title: task.title,
         subtitle: details.isEmpty ? 'No date' : details.join('  ·  '),
         onTap: onOpen,
-        done: date == null ? task.isCompleted : task.isDoneOn(date!),
+        onDetails: done ? onCompletionOpen : null,
+        done: done,
         onToggle: () async {
           final taskDate = date ?? task.dueAt ?? DateTime.now();
           final done = date == null ? task.isCompleted : task.isDoneOn(date!);
@@ -2907,6 +2930,17 @@ class _CalendarTile extends StatelessWidget {
     ),
   );
 }
+
+Future<bool?> showTaskCompletionRecord(
+  BuildContext context,
+  LifeStore store,
+  LifeTask task,
+  DateTime day,
+) => Navigator.of(context).push<bool>(
+  MaterialPageRoute(
+    builder: (_) => TaskCompletionPage(store: store, task: task, day: day),
+  ),
+);
 
 Future<void> showTaskEditor(
   BuildContext context,
@@ -3269,9 +3303,7 @@ class _TaskEditorState extends State<_TaskEditor> {
     }
   }
 
-  Future<void> _importInsertedContent(
-    KeyboardInsertedContent content,
-  ) async {
+  Future<void> _importInsertedContent(KeyboardInsertedContent content) async {
     try {
       final attachment = await AttachmentPicker.importKeyboardContent(content);
       if (attachment != null && mounted) {

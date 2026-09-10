@@ -198,24 +198,167 @@ class LifeAttachment {
   );
 }
 
+enum TaskCompletionOutcome {
+  completed('Completed'),
+  partiallyCompleted('Partially completed'),
+  skipped('Skipped');
+
+  const TaskCompletionOutcome(this.label);
+  final String label;
+
+  static TaskCompletionOutcome parse(String? value) =>
+      TaskCompletionOutcome.values.firstWhere(
+        (item) => item.name == value,
+        orElse: () => TaskCompletionOutcome.completed,
+      );
+}
+
+enum TaskCompletionEffort {
+  easy('Easy'),
+  normal('Normal'),
+  hard('Hard');
+
+  const TaskCompletionEffort(this.label);
+  final String label;
+
+  static TaskCompletionEffort parse(String? value) =>
+      TaskCompletionEffort.values.firstWhere(
+        (item) => item.name == value,
+        orElse: () => TaskCompletionEffort.normal,
+      );
+}
+
+class CompletionPerson {
+  const CompletionPerson({
+    required this.id,
+    required this.name,
+    this.phone = '',
+    this.imagePath = '',
+  });
+
+  final String id;
+  final String name;
+  final String phone;
+  final String imagePath;
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'phone': phone,
+    'imagePath': imagePath,
+  };
+
+  factory CompletionPerson.fromJson(Map<String, Object?> json) =>
+      CompletionPerson(
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String? ?? 'Person',
+        phone: json['phone'] as String? ?? '',
+        imagePath: json['imagePath'] as String? ?? '',
+      );
+}
+
 class TaskCompletionNote {
   const TaskCompletionNote({
     required this.day,
     required this.recordedAt,
     required this.text,
     this.attachments = const [],
+    this.outcome = TaskCompletionOutcome.completed,
+    this.actualStartAt,
+    this.actualEndAt,
+    this.scheduledStartAt,
+    this.scheduledEndAt,
+    this.locationName = '',
+    this.locationAddress = '',
+    this.latitude,
+    this.longitude,
+    this.people = const [],
+    this.effort = TaskCompletionEffort.normal,
   });
 
   final DateTime day;
   final DateTime recordedAt;
   final String text;
   final List<LifeAttachment> attachments;
+  final TaskCompletionOutcome outcome;
+  final DateTime? actualStartAt;
+  final DateTime? actualEndAt;
+  final DateTime? scheduledStartAt;
+  final DateTime? scheduledEndAt;
+  final String locationName;
+  final String locationAddress;
+  final double? latitude;
+  final double? longitude;
+  final List<CompletionPerson> people;
+  final TaskCompletionEffort effort;
+
+  bool get isLate {
+    final actual = actualEndAt ?? recordedAt;
+    return scheduledEndAt != null && actual.isAfter(scheduledEndAt!);
+  }
+
+  TaskCompletionNote copyWith({
+    DateTime? day,
+    DateTime? recordedAt,
+    String? text,
+    List<LifeAttachment>? attachments,
+    TaskCompletionOutcome? outcome,
+    DateTime? actualStartAt,
+    bool clearActualStart = false,
+    DateTime? actualEndAt,
+    bool clearActualEnd = false,
+    DateTime? scheduledStartAt,
+    bool clearScheduledStart = false,
+    DateTime? scheduledEndAt,
+    bool clearScheduledEnd = false,
+    String? locationName,
+    String? locationAddress,
+    double? latitude,
+    bool clearLatitude = false,
+    double? longitude,
+    bool clearLongitude = false,
+    List<CompletionPerson>? people,
+    TaskCompletionEffort? effort,
+  }) => TaskCompletionNote(
+    day: day ?? this.day,
+    recordedAt: recordedAt ?? this.recordedAt,
+    text: text ?? this.text,
+    attachments: attachments ?? this.attachments,
+    outcome: outcome ?? this.outcome,
+    actualStartAt: clearActualStart
+        ? null
+        : actualStartAt ?? this.actualStartAt,
+    actualEndAt: clearActualEnd ? null : actualEndAt ?? this.actualEndAt,
+    scheduledStartAt: clearScheduledStart
+        ? null
+        : scheduledStartAt ?? this.scheduledStartAt,
+    scheduledEndAt: clearScheduledEnd
+        ? null
+        : scheduledEndAt ?? this.scheduledEndAt,
+    locationName: locationName ?? this.locationName,
+    locationAddress: locationAddress ?? this.locationAddress,
+    latitude: clearLatitude ? null : latitude ?? this.latitude,
+    longitude: clearLongitude ? null : longitude ?? this.longitude,
+    people: people ?? this.people,
+    effort: effort ?? this.effort,
+  );
 
   Map<String, Object?> toJson() => {
     'day': day.toIso8601String(),
     'recordedAt': recordedAt.toIso8601String(),
     'text': text,
     'attachments': attachments.map((item) => item.toJson()).toList(),
+    'outcome': outcome.name,
+    'actualStartAt': actualStartAt?.toIso8601String(),
+    'actualEndAt': actualEndAt?.toIso8601String(),
+    'scheduledStartAt': scheduledStartAt?.toIso8601String(),
+    'scheduledEndAt': scheduledEndAt?.toIso8601String(),
+    'locationName': locationName,
+    'locationAddress': locationAddress,
+    'latitude': latitude,
+    'longitude': longitude,
+    'people': people.map((item) => item.toJson()).toList(),
+    'effort': effort.name,
   };
 
   factory TaskCompletionNote.fromJson(Map<String, Object?> json) =>
@@ -230,6 +373,23 @@ class TaskCompletionNote {
                   LifeAttachment.fromJson(Map<String, Object?>.from(item)),
             )
             .toList(),
+        outcome: TaskCompletionOutcome.parse(json['outcome'] as String?),
+        actualStartAt: _date(json['actualStartAt']),
+        actualEndAt: _date(json['actualEndAt']),
+        scheduledStartAt: _date(json['scheduledStartAt']),
+        scheduledEndAt: _date(json['scheduledEndAt']),
+        locationName: json['locationName'] as String? ?? '',
+        locationAddress: json['locationAddress'] as String? ?? '',
+        latitude: (json['latitude'] as num?)?.toDouble(),
+        longitude: (json['longitude'] as num?)?.toDouble(),
+        people: (json['people'] as List<Object?>? ?? const [])
+            .whereType<Map>()
+            .map(
+              (item) =>
+                  CompletionPerson.fromJson(Map<String, Object?>.from(item)),
+            )
+            .toList(),
+        effort: TaskCompletionEffort.parse(json['effort'] as String?),
       );
 }
 

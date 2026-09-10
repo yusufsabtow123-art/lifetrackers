@@ -147,17 +147,30 @@ class LifeStore extends ChangeNotifier {
         )
         .toList();
     final trimmedNote = note.trim();
+    final now = _clock();
     if (trimmedNote.isNotEmpty || attachments.isNotEmpty) {
+      final scheduledStart = task.dueAt == null
+          ? null
+          : DateTime(
+              day.year,
+              day.month,
+              day.day,
+              task.dueAt!.hour,
+              task.dueAt!.minute,
+            );
       notes.add(
         TaskCompletionNote(
           day: day,
-          recordedAt: _clock(),
+          recordedAt: now,
           text: trimmedNote,
           attachments: attachments,
+          actualEndAt: now,
+          scheduledStartAt: scheduledStart,
+          scheduledEndAt: scheduledStart?.add(const Duration(hours: 1)),
+          locationName: task.location,
         ),
       );
     }
-    final now = _clock();
     final logEntry = LifeLogEntry(
       id: _id('log', now),
       createdAt: now,
@@ -220,6 +233,36 @@ class LifeStore extends ChangeNotifier {
               spaceId: task.spaceId,
             ),
     );
+  }
+
+  Future<void> saveTaskCompletionRecord(
+    LifeTask task,
+    TaskCompletionNote record,
+  ) async {
+    final day = DateTime(record.day.year, record.day.month, record.day.day);
+    final notes =
+        task.completionNotes
+            .where(
+              (item) =>
+                  item.day.year != record.day.year ||
+                  item.day.month != record.day.month ||
+                  item.day.day != record.day.day,
+            )
+            .toList()
+          ..add(record);
+    var updated = task.copyWith(completionNotes: notes);
+    if (!task.isDoneOn(day)) {
+      if (task.repeat == TaskRepeat.none) {
+        updated = updated.copyWith(
+          completedAt: record.actualEndAt ?? record.recordedAt,
+        );
+      } else {
+        updated = updated.copyWith(
+          completedDates: [...task.completedDates, day],
+        );
+      }
+    }
+    await _replaceTask(updated);
   }
 
   Future<void> addJournalEntry(
