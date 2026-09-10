@@ -72,6 +72,38 @@ void main() {
     expect(find.byKey(const ValueKey('complete')), findsOneWidget);
   });
 
+  testWidgets('Today task arrow opens completion while its name still edits', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final today = DateTime(2026, 9, 10, 18, 7);
+    final goals = GoalStore(
+      repository: MemoryGoalRepository(),
+      clock: () => today,
+    );
+    await goals.load();
+    final tasks = LifeStore(MemoryLifeRepository(), clock: () => today);
+    await tasks.load();
+    await tasks.addTask(title: 'Call Ahmed', dueAt: today);
+
+    await tester.pumpWidget(GoalApp(store: goals, lifeStore: tasks));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Completion details'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Completion record'), findsOneWidget);
+    expect(find.text('Call Ahmed'), findsOneWidget);
+    expect(find.text('Edit task'), findsNothing);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Call Ahmed'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit task'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Today goal arrow opens the approved completion record', (
     tester,
   ) async {

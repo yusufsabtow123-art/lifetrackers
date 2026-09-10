@@ -516,6 +516,8 @@ class TodayPage extends StatelessWidget {
             finishDayOnComplete: remaining == 1,
             onOpen: () =>
                 showTaskEditor(context, lifeStore, goalStore, task: task),
+            onCompletionOpen: () =>
+                showTaskCompletionRecord(context, lifeStore, task, today),
           ),
         ),
       for (final entry in entries)
@@ -2718,7 +2720,7 @@ class _TaskTile extends StatelessWidget {
         title: task.title,
         subtitle: details.isEmpty ? 'No date' : details.join('  ·  '),
         onTap: onOpen,
-        onDetails: done ? onCompletionOpen : null,
+        onDetails: onCompletionOpen,
         done: done,
         onToggle: () async {
           final taskDate = date ?? task.dueAt ?? DateTime.now();
