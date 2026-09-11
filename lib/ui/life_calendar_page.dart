@@ -11,6 +11,7 @@ import '../domain/goal.dart';
 import '../domain/life_data.dart';
 import '../domain/plan_calculator.dart';
 import 'app_theme.dart';
+import 'activity_icon_catalog.dart';
 
 enum _CalendarView { schedule, day, threeDays, week, month }
 
@@ -31,17 +32,19 @@ class LifeCalendarPage extends StatefulWidget {
 }
 
 class _LifeCalendarPageState extends State<LifeCalendarPage> {
-  static const _hourHeight = 36.0;
+  // The approved phone design intentionally shows the working day at a glance
+  // (roughly 5 AM through 10 PM) instead of making the day view feel like an
+  // endless vertical list.
+  static const _hourHeight = 30.0;
 
   late DateTime _selected = widget.goalStore.today;
   late DateTime _month = DateTime(_selected.year, _selected.month);
   late final ScrollController _timelineController = ScrollController(
     // Start early enough to reveal seasonal Fajr while retaining the complete
     // midnight-to-midnight grid above and below.
-    initialScrollOffset: 4 * _hourHeight - 16,
+    initialScrollOffset: 5 * _hourHeight - 16,
   );
-  _CalendarView _view = _CalendarView.week;
-  bool _mobileViewExplicit = false;
+  _CalendarView _view = _CalendarView.day;
 
   @override
   void dispose() {
@@ -52,10 +55,7 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
   @override
   Widget build(BuildContext context) {
     final mobile = MediaQuery.sizeOf(context).width < 820;
-    final effectiveView =
-        mobile && !_mobileViewExplicit && _view == _CalendarView.week
-        ? _CalendarView.day
-        : _view;
+    final effectiveView = _view;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         mobile ? 14 : 24,
@@ -75,73 +75,18 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
                     style: Theme.of(context).textTheme.displaySmall,
                   ),
                 ),
-                IconButton(
-                  tooltip: effectiveView == _CalendarView.month
-                      ? 'Day'
-                      : 'Month',
-                  onPressed: () => setState(() {
-                    _mobileViewExplicit = true;
-                    _view = effectiveView == _CalendarView.month
-                        ? _CalendarView.day
-                        : _CalendarView.month;
-                  }),
-                  icon: const Icon(Icons.calendar_today_outlined, size: 20),
-                ),
-                PopupMenuButton<String>(
-                  tooltip: 'Calendar options',
-                  onSelected: (value) {
-                    if (value == 'today') {
-                      setState(() {
-                        _selected = widget.goalStore.today;
-                        _month = DateTime(_selected.year, _selected.month);
-                        _view = mobile ? _CalendarView.day : _CalendarView.week;
-                      });
-                    }
-                    if (value == 'blocks') {
-                      widget.lifeStore.setShowBlockedTimes(
-                        !widget.lifeStore.data.showBlockedTimes,
-                      );
-                    }
-                    if (value == 'import') _openImport();
-                    if (value.startsWith('view:')) {
-                      final name = value.substring(5);
-                      setState(() {
-                        _mobileViewExplicit = true;
-                        _view = _CalendarView.values.firstWhere(
-                          (item) => item.name == name,
-                        );
-                      });
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(
-                      value: 'today',
-                      child: Text('Go to today'),
+                GestureDetector(
+                  onLongPress: _openImport,
+                  child: IconButton(
+                    key: const Key('calendar-floating-add-button'),
+                    tooltip: 'Add to calendar',
+                    onPressed: () => _openEditor(_selected),
+                    icon: Icon(
+                      Icons.add_rounded,
+                      size: 24,
+                      color: context.appText,
                     ),
-                    PopupMenuItem(
-                      value: 'blocks',
-                      child: Text(
-                        widget.lifeStore.data.showBlockedTimes
-                            ? widget.settings?.salahEnabled == true
-                                  ? 'Hide other blocked times'
-                                  : 'Hide blocked times'
-                            : widget.settings?.salahEnabled == true
-                            ? 'Show other blocked times'
-                            : 'Show blocked times',
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'import',
-                      child: Text('Import changing blocked times'),
-                    ),
-                    const PopupMenuDivider(),
-                    for (final view in _CalendarView.values)
-                      PopupMenuItem(
-                        value: 'view:${view.name}',
-                        child: Text(_calendarViewLabel(view)),
-                      ),
-                  ],
-                  icon: const Icon(Icons.more_vert, size: 20),
+                  ),
                 ),
               ],
             )
@@ -159,7 +104,14 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
               onImport: _openImport,
             ),
           const SizedBox(height: 6),
-          if (!mobile)
+          if (mobile) ...[
+            _ViewSelector(
+              value: _view,
+              compact: true,
+              onChanged: (v) => setState(() => _view = v),
+            ),
+            const SizedBox(height: 6),
+          ] else
             Row(
               children: [
                 _ViewSelector(
@@ -191,20 +143,6 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
                     },
                   ),
                 ),
-                if (mobile)
-                  Positioned(
-                    right: 12,
-                    bottom: 12,
-                    child: FloatingActionButton(
-                      key: const Key('calendar-floating-add-button'),
-                      tooltip: 'Add to calendar',
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      shape: const CircleBorder(),
-                      onPressed: () => _openEditor(_selected),
-                      child: const Icon(Icons.add_rounded),
-                    ),
-                  ),
               ],
             ),
           ),
@@ -234,7 +172,7 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
           _month = DateTime(_selected.year, _selected.month);
         }),
       ),
-      const SizedBox(height: 10),
+      const SizedBox(height: 2),
       Expanded(
         child: _DaySchedule(
           key: const Key('calendar-day-timeline'),
@@ -423,9 +361,14 @@ class _CalendarHeader extends StatelessWidget {
 }
 
 class _ViewSelector extends StatelessWidget {
-  const _ViewSelector({required this.value, required this.onChanged});
+  const _ViewSelector({
+    required this.value,
+    required this.onChanged,
+    this.compact = false,
+  });
   final _CalendarView value;
   final ValueChanged<_CalendarView> onChanged;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -436,37 +379,57 @@ class _ViewSelector extends StatelessWidget {
       border: Border.all(color: context.appBorder),
     ),
     child: Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: compact ? MainAxisSize.max : MainAxisSize.min,
       children: [
-        _ViewButton(
-          label: 'Schedule',
-          icon: Icons.view_agenda_outlined,
-          selected: value == _CalendarView.schedule,
-          onTap: () => onChanged(_CalendarView.schedule),
+        Flexible(
+          fit: compact ? FlexFit.tight : FlexFit.loose,
+          child: _ViewButton(
+            label: 'Schedule',
+            icon: Icons.view_agenda_outlined,
+            compact: compact,
+            selected: value == _CalendarView.schedule,
+            onTap: () => onChanged(_CalendarView.schedule),
+          ),
         ),
-        _ViewButton(
-          label: 'Day',
-          icon: Icons.view_day_outlined,
-          selected: value == _CalendarView.day,
-          onTap: () => onChanged(_CalendarView.day),
+        Flexible(
+          fit: compact ? FlexFit.tight : FlexFit.loose,
+          child: _ViewButton(
+            label: 'Day',
+            icon: Icons.view_day_outlined,
+            compact: compact,
+            selected: value == _CalendarView.day,
+            onTap: () => onChanged(_CalendarView.day),
+          ),
         ),
-        _ViewButton(
-          label: '3 days',
-          icon: Icons.view_week_outlined,
-          selected: value == _CalendarView.threeDays,
-          onTap: () => onChanged(_CalendarView.threeDays),
+        Flexible(
+          fit: compact ? FlexFit.tight : FlexFit.loose,
+          child: _ViewButton(
+            label: '3 Days',
+            icon: Icons.view_week_outlined,
+            compact: compact,
+            selected: value == _CalendarView.threeDays,
+            onTap: () => onChanged(_CalendarView.threeDays),
+          ),
         ),
-        _ViewButton(
-          label: 'Week',
-          icon: Icons.calendar_view_week_outlined,
-          selected: value == _CalendarView.week,
-          onTap: () => onChanged(_CalendarView.week),
+        Flexible(
+          fit: compact ? FlexFit.tight : FlexFit.loose,
+          child: _ViewButton(
+            label: 'Week',
+            icon: Icons.calendar_view_week_outlined,
+            compact: compact,
+            selected: value == _CalendarView.week,
+            onTap: () => onChanged(_CalendarView.week),
+          ),
         ),
-        _ViewButton(
-          label: 'Month',
-          icon: Icons.calendar_view_month_outlined,
-          selected: value == _CalendarView.month,
-          onTap: () => onChanged(_CalendarView.month),
+        Flexible(
+          fit: compact ? FlexFit.tight : FlexFit.loose,
+          child: _ViewButton(
+            label: 'Month',
+            icon: Icons.calendar_view_month_outlined,
+            compact: compact,
+            selected: value == _CalendarView.month,
+            onTap: () => onChanged(_CalendarView.month),
+          ),
         ),
       ],
     ),
@@ -479,37 +442,64 @@ class _ViewButton extends StatelessWidget {
     required this.icon,
     required this.selected,
     required this.onTap,
+    this.compact = false,
   });
   final String label;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(6),
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: selected ? context.appRaised : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: selected ? null : context.appMuted),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? null : context.appMuted,
-            ),
-          ),
-        ],
+  Widget build(BuildContext context) => Tooltip(
+    message: label,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        alignment: Alignment.center,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 2 : 12,
+          vertical: 7,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? context.appSoftRed : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: compact
+            ? FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected ? context.appDangerText : context.appMuted,
+                  ),
+                ),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 16,
+                    color: selected ? context.appDangerText : context.appMuted,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected
+                          ? context.appDangerText
+                          : context.appMuted,
+                    ),
+                  ),
+                ],
+              ),
       ),
     ),
   );
@@ -575,6 +565,7 @@ class _WeekStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mobile = MediaQuery.sizeOf(context).width < 820;
     final weekStart = _dateOnly(
       selected.subtract(Duration(days: selected.weekday - 1)),
     );
@@ -588,54 +579,67 @@ class _WeekStrip extends StatelessWidget {
             ? null
             : Border.all(color: context.appBorder),
       ),
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
+      padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
       child: Column(
         children: [
           Row(
             children: [
               IconButton(
                 visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 36,
+                  height: 36,
+                ),
+                padding: EdgeInsets.zero,
                 onPressed: onPrevious,
                 icon: const Icon(Icons.chevron_left_rounded),
               ),
               Expanded(
                 child: Text(
-                  '${_monthName(selected.month)} ${selected.year}',
+                  mobile
+                      ? _friendlyDate(selected)
+                      : '${_monthName(selected.month)} ${selected.year}',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 36,
+                  height: 36,
+                ),
+                padding: EdgeInsets.zero,
                 onPressed: onNext,
                 icon: const Icon(Icons.chevron_right_rounded),
               ),
             ],
           ),
-          Row(
-            children: [
-              for (var i = 0; i < 7; i++)
-                Expanded(
-                  child: _WeekDay(
-                    date: weekStart.add(Duration(days: i)),
-                    selected: selected,
-                    today: today,
-                    hasItems:
-                        lifeStore
-                            .entriesFor(weekStart.add(Duration(days: i)))
-                            .isNotEmpty ||
-                        lifeStore
-                            .tasksFor(weekStart.add(Duration(days: i)))
-                            .isNotEmpty ||
-                        _goalActions(
-                          goalStore,
-                          weekStart.add(Duration(days: i)),
-                        ).isNotEmpty,
-                    onSelect: onSelect,
+          if (!mobile)
+            Row(
+              children: [
+                for (var i = 0; i < 7; i++)
+                  Expanded(
+                    child: _WeekDay(
+                      date: weekStart.add(Duration(days: i)),
+                      selected: selected,
+                      today: today,
+                      hasItems:
+                          lifeStore
+                              .entriesFor(weekStart.add(Duration(days: i)))
+                              .isNotEmpty ||
+                          lifeStore
+                              .tasksFor(weekStart.add(Duration(days: i)))
+                              .isNotEmpty ||
+                          _goalActions(
+                            goalStore,
+                            weekStart.add(Duration(days: i)),
+                          ).isNotEmpty,
+                      onSelect: onSelect,
+                    ),
                   ),
-                ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
@@ -1171,6 +1175,7 @@ class _DaySchedule extends StatelessWidget {
     final goals = _goalActions(goalStore, date);
     final tasks = lifeStore.tasksFor(date);
     final entries = lifeStore.entriesFor(date);
+    final now = DateTime.now();
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -1209,14 +1214,45 @@ class _DaySchedule extends StatelessWidget {
                         child: Stack(
                           children: [
                             for (var hour = 0; hour < 24; hour++)
+                              if (!_sameDate(date, now) ||
+                                  (hour * 60 - (now.hour * 60 + now.minute))
+                                          .abs() >=
+                                      20)
+                                Positioned(
+                                  top: hour * hourHeight - 7,
+                                  right: 8,
+                                  child: Text(
+                                    _hourLabel(hour),
+                                    style: TextStyle(
+                                      color: context.appMuted,
+                                      fontSize: 9.5,
+                                    ),
+                                  ),
+                                ),
+                            if (_sameDate(date, now))
                               Positioned(
-                                top: hour * hourHeight - 7,
-                                right: 8,
-                                child: Text(
-                                  _hourLabel(hour),
-                                  style: TextStyle(
-                                    color: context.appMuted,
-                                    fontSize: 9.5,
+                                top:
+                                    (now.hour * 60 + now.minute) /
+                                        60 *
+                                        hourHeight -
+                                    7,
+                                right: 5,
+                                child: ColoredBox(
+                                  color: Theme.of(
+                                    context,
+                                  ).scaffoldBackgroundColor,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
+                                    child: Text(
+                                      _time(now),
+                                      style: const TextStyle(
+                                        color: Color(0xFFE26868),
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1534,7 +1570,7 @@ class _TimelineCanvasState extends State<_TimelineCanvas> {
     final left = 4 + occurrence.lane * laneWidth;
     final top = occurrence.startMinute / 60 * widget.hourHeight + 1;
     final height = math.max(
-      28.0,
+      22.0,
       (occurrence.endMinute - occurrence.startMinute) / 60 * widget.hourHeight -
           2,
     );
@@ -1552,7 +1588,7 @@ class _TimelineCanvasState extends State<_TimelineCanvas> {
           onTap: () => widget.onOpenEntry(occurrence.entry),
           borderRadius: BorderRadius.circular(6),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(7, 5, 5, 4),
+            padding: const EdgeInsets.fromLTRB(6, 2, 4, 2),
             decoration: BoxDecoration(
               color: Color.alphaBlend(
                 color.withValues(alpha: blocked ? .20 : .24),
@@ -1564,7 +1600,7 @@ class _TimelineCanvasState extends State<_TimelineCanvas> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (blocked)
+                if (blocked && !occurrence.entry.id.startsWith('salah-'))
                   IgnorePointer(
                     child: CustomPaint(
                       painter: _BlockedTimePainter(
@@ -1575,21 +1611,44 @@ class _TimelineCanvasState extends State<_TimelineCanvas> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      occurrence.entry.title,
-                      maxLines: height >= 48 ? 2 : 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    Row(
+                      children: [
+                        ActivityIcon(
+                          id: occurrence.entry.id.startsWith('salah-')
+                              ? 'masjid'
+                              : occurrence.entry.iconId == 'calendar'
+                              ? ActivityIconCatalog.guess(
+                                  occurrence.entry.title,
+                                ).id
+                              : occurrence.entry.iconId,
+                          size: 10,
+                          color: color,
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            occurrence.entry.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              height: 1,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    if (height >= 45)
+                    if (height >= 22)
                       Text(
                         '${_time(occurrence.start)}–${_time(occurrence.end)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 9, color: context.appMuted),
+                        style: TextStyle(
+                          fontSize: 7.5,
+                          height: 1,
+                          color: context.appMuted,
+                        ),
                       ),
                     if (height >= 66 && occurrence.entry.location.isNotEmpty)
                       Text(
@@ -1974,6 +2033,7 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
   late int _colorValue;
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
+  late String _iconId;
   String? _error;
 
   bool get _editing => widget.entry != null;
@@ -1992,6 +2052,7 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
     _repeatInterval = entry?.repeatInterval ?? 1;
     _repeatWeekdays = {...(entry?.repeatWeekdays ?? const <int>{})};
     _repeatUntil = entry?.repeatUntil;
+    _iconId = entry?.iconId ?? 'calendar';
     _colorValue =
         entry?.colorValue ??
         (entry?.kind == CalendarEntryKind.blockedTime
@@ -2099,6 +2160,23 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
                         ? 'What is this time protected for?'
                         : 'Event name',
                   ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final chosen = await showActivityIconPicker(
+                      context,
+                      selectedId:
+                          _iconId == 'calendar' && _title.text.trim().isNotEmpty
+                          ? ActivityIconCatalog.guess(_title.text).id
+                          : _iconId,
+                    );
+                    if (chosen != null && mounted) {
+                      setState(() => _iconId = chosen);
+                    }
+                  },
+                  icon: ActivityIcon(id: _iconId),
+                  label: const Text('Choose activity icon'),
                 ),
                 const SizedBox(height: 12),
                 _CalendarColorField(
@@ -2267,6 +2345,9 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
         repeatWeekdays: _repeatWeekdays,
         repeatUntil: _repeatUntil,
         colorValue: _colorValue,
+        iconId: _iconId == 'calendar'
+            ? ActivityIconCatalog.guess(title).id
+            : _iconId,
       );
     } else {
       await widget.store.updateCalendarEntry(
@@ -2282,6 +2363,9 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
           repeatUntil: _repeatUntil,
           clearRepeatUntil: _repeatUntil == null,
           colorValue: _colorValue,
+          iconId: _iconId == 'calendar'
+              ? ActivityIconCatalog.guess(title).id
+              : _iconId,
         ),
       );
     }
@@ -3061,14 +3145,6 @@ DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
 
 bool _sameDate(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
-
-String _calendarViewLabel(_CalendarView view) => switch (view) {
-  _CalendarView.schedule => 'Schedule',
-  _CalendarView.day => 'Day',
-  _CalendarView.threeDays => '3 days',
-  _CalendarView.week => 'Week',
-  _CalendarView.month => 'Month',
-};
 
 String _weekdayLetter(int weekday) =>
     const ['M', 'T', 'W', 'T', 'F', 'S', 'S'][weekday - 1];

@@ -92,7 +92,7 @@ class GoalStore extends ChangeNotifier {
     }
   }
 
-  Future<Goal> createQuick(String name) async {
+  Future<Goal> createQuick(String name, {String iconId = 'goal'}) async {
     final now = _clock();
     final goal = Goal(
       id: _newId(name, now),
@@ -100,6 +100,7 @@ class GoalStore extends ChangeNotifier {
       status: GoalStatus.ideas,
       createdAt: now,
       updatedAt: now,
+      iconId: iconId,
     );
     _goals.add(goal);
     notifyListeners();
@@ -114,6 +115,7 @@ class GoalStore extends ChangeNotifier {
     required DateTime startDate,
     required DateTime deadline,
     required bool wholeUnits,
+    String iconId = 'goal',
     double initialCompletedAmount = 0,
   }) async {
     const activeWeekdays = {1, 2, 3, 4, 5, 6, 7};
@@ -148,6 +150,7 @@ class GoalStore extends ChangeNotifier {
           : GoalStatus.planned,
       createdAt: now,
       updatedAt: now,
+      iconId: iconId,
       plan: plan,
       completedAmount: initial,
       progressHistory: initial > 0
@@ -187,6 +190,7 @@ class GoalStore extends ChangeNotifier {
       dailyActionCompletions: source.dailyActionCompletions,
       steps: source.steps,
       updates: source.updates,
+      iconId: source.iconId,
     );
     _goals.add(duplicate);
     notifyListeners();

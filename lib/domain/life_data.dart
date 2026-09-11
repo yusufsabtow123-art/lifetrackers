@@ -31,6 +31,7 @@ class LifeTask {
     this.spaceId = LifeSpace.personalId,
     this.assignee = '',
     this.attachments = const [],
+    this.iconId = 'task',
   });
 
   final String id;
@@ -47,6 +48,7 @@ class LifeTask {
   final String spaceId;
   final String assignee;
   final List<LifeAttachment> attachments;
+  final String iconId;
 
   bool get isCompleted => completedAt != null;
 
@@ -91,6 +93,7 @@ class LifeTask {
     String? spaceId,
     String? assignee,
     List<LifeAttachment>? attachments,
+    String? iconId,
   }) => LifeTask(
     id: id,
     title: title ?? this.title,
@@ -106,6 +109,7 @@ class LifeTask {
     spaceId: spaceId ?? this.spaceId,
     assignee: assignee ?? this.assignee,
     attachments: attachments ?? this.attachments,
+    iconId: iconId ?? this.iconId,
   );
 
   Map<String, Object?> toJson() => {
@@ -125,6 +129,7 @@ class LifeTask {
     'spaceId': spaceId,
     'assignee': assignee,
     'attachments': attachments.map((item) => item.toJson()).toList(),
+    'iconId': iconId,
   };
 
   factory LifeTask.fromJson(Map<String, Object?> json) => LifeTask(
@@ -154,6 +159,7 @@ class LifeTask {
         .whereType<Map>()
         .map((item) => LifeAttachment.fromJson(Map<String, Object?>.from(item)))
         .toList(),
+    iconId: json['iconId'] as String? ?? 'task',
   );
 }
 
@@ -428,6 +434,7 @@ class CalendarEntry {
     this.repeatWeekdays = const <int>{},
     this.repeatUntil,
     this.colorValue,
+    this.iconId = 'calendar',
   });
 
   final String id;
@@ -443,6 +450,7 @@ class CalendarEntry {
   final Set<int> repeatWeekdays;
   final DateTime? repeatUntil;
   final int? colorValue;
+  final String iconId;
 
   bool occursOn(DateTime day) {
     if (repeat != CalendarRepeat.none) {
@@ -507,6 +515,7 @@ class CalendarEntry {
     bool clearRepeatUntil = false,
     int? colorValue,
     bool clearColor = false,
+    String? iconId,
   }) => CalendarEntry(
     id: id,
     title: title ?? this.title,
@@ -521,6 +530,7 @@ class CalendarEntry {
     repeatWeekdays: repeatWeekdays ?? this.repeatWeekdays,
     repeatUntil: clearRepeatUntil ? null : repeatUntil ?? this.repeatUntil,
     colorValue: clearColor ? null : colorValue ?? this.colorValue,
+    iconId: iconId ?? this.iconId,
   );
 
   Map<String, Object?> toJson() => {
@@ -537,6 +547,7 @@ class CalendarEntry {
     'repeatWeekdays': repeatWeekdays.toList()..sort(),
     'repeatUntil': repeatUntil?.toIso8601String(),
     'colorValue': colorValue,
+    'iconId': iconId,
   };
 
   factory CalendarEntry.fromJson(Map<String, Object?> json) => CalendarEntry(
@@ -563,6 +574,7 @@ class CalendarEntry {
             .toSet(),
     repeatUntil: _date(json['repeatUntil']),
     colorValue: (json['colorValue'] as num?)?.toInt(),
+    iconId: json['iconId'] as String? ?? 'calendar',
   );
 
   bool _repeatMatches(DateTime day, DateTime firstDay) {

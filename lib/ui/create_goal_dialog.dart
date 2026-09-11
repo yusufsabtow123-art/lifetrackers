@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app/goal_store.dart';
 import '../domain/plan_calculator.dart';
 import 'app_theme.dart';
+import 'activity_icon_catalog.dart';
 import 'progress_format.dart';
 
 Future<void> showCreateGoalDialog(BuildContext context, GoalStore store) {
@@ -52,6 +53,7 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
   bool _countDownFromTotal = false;
   bool _saving = false;
   String? _error;
+  String _iconId = 'goal';
   late DateTime _startDate;
   late DateTime _deadline;
 
@@ -65,6 +67,7 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
         ? null
         : widget.store.goalById(widget.existingGoalId!);
     if (existing != null) {
+      _iconId = existing.iconId;
       _nameController.text = existing.name;
       final plan = existing.plan;
       if (plan != null) {
@@ -164,6 +167,31 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
                 decoration: const InputDecoration(
                   labelText: 'What is the goal?',
                   hintText: 'What do you want to finish?',
+                ),
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _isExisting
+                      ? null
+                      : () async {
+                          final chosen = await showActivityIconPicker(
+                            context,
+                            selectedId:
+                                _iconId == 'goal' &&
+                                    _nameController.text.trim().isNotEmpty
+                                ? ActivityIconCatalog.guess(
+                                    _nameController.text,
+                                  ).id
+                                : _iconId,
+                          );
+                          if (chosen != null && mounted) {
+                            setState(() => _iconId = chosen);
+                          }
+                        },
+                  icon: ActivityIcon(id: _iconId),
+                  label: const Text('Choose icon'),
                 ),
               ),
               if (!_planning) ...[
@@ -276,7 +304,10 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
       return;
     }
     setState(() => _saving = true);
-    await widget.store.createQuick(name);
+    await widget.store.createQuick(
+      name,
+      iconId: _iconId == 'goal' ? ActivityIconCatalog.guess(name).id : _iconId,
+    );
     if (mounted) Navigator.pop(context);
   }
 
@@ -328,6 +359,9 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
         deadline: _deadline,
         wholeUnits: _wholeUnits,
         initialCompletedAmount: initialCompleted,
+        iconId: _iconId == 'goal'
+            ? ActivityIconCatalog.guess(name).id
+            : _iconId,
       );
     }
     if (mounted) Navigator.pop(context);

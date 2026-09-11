@@ -17,6 +17,7 @@ class GoalMarkdownCodec {
       'name': goal.name,
       'status': goal.status.name,
       'category': goal.category,
+      'icon_id': goal.iconId,
       'is_urgent': goal.isUrgent,
       'urgency_style': goal.urgencyStyle.name,
       'reminder': goal.reminder == null
@@ -354,6 +355,7 @@ class GoalMarkdownCodec {
       category: (metadata['category'] as String?)?.trim().isNotEmpty == true
           ? (metadata['category']! as String).trim()
           : GoalCategories.other,
+      iconId: metadata['icon_id'] as String? ?? 'goal',
       isUrgent: metadata['is_urgent'] as bool? ?? false,
       urgencyStyle: UrgencyStyle.parse(metadata['urgency_style'] as String?),
       reminder: reminder,

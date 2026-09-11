@@ -13,6 +13,7 @@ import '../domain/plan_calculator.dart';
 import '../platform/goal_notification_service.dart';
 import '../platform/attachment_picker.dart';
 import 'app_theme.dart';
+import 'activity_icon_catalog.dart';
 import 'life_calendar_page.dart';
 import 'life_goals_page.dart';
 import 'life_icons.dart';
@@ -20,7 +21,6 @@ import 'life_quotes.dart';
 import 'link_text.dart';
 import 'settings_page.dart';
 import 'speech_input_button.dart';
-import 'task_completion_sheet.dart';
 import 'task_completion_page.dart';
 
 enum _Destination { today, goals, tasks, calendar, log, spaces, ai, more }
@@ -488,6 +488,14 @@ class TodayPage extends StatelessWidget {
             subtitle:
                 '${formatAmount(action.amount)} ${action.goal.plan!.unit}',
             done: false,
+            detailIcon: ActivityIcon(
+              id: action.goal.iconId == 'goal'
+                  ? ActivityIconCatalog.guess(action.goal.name).id
+                  : action.goal.iconId,
+              size: 14,
+              color: context.appBlueText,
+            ),
+            tint: context.isDarkMode ? null : context.appSoftBlue,
             onTap: () => showGoalActionCompletionRecord(
               context,
               goalStore,
@@ -514,6 +522,7 @@ class TodayPage extends StatelessWidget {
             date: today,
             completionCheckIns: settings.completionCheckIns,
             finishDayOnComplete: remaining == 1,
+            highlight: true,
             onOpen: () =>
                 showTaskEditor(context, lifeStore, goalStore, task: task),
             onCompletionOpen: () =>
@@ -541,22 +550,6 @@ class TodayPage extends StatelessWidget {
     final plan = ListView(
       padding: EdgeInsets.zero,
       children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Daily plan',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-              ),
-            ),
-            Text(
-              '${pendingTasks.length}',
-              key: const Key('today-task-count'),
-              style: TextStyle(fontSize: 11, color: context.appMuted),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
         if (rows.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
@@ -579,6 +572,13 @@ class TodayPage extends StatelessWidget {
                   subtitle:
                       '${formatAmount(goal.completionFor(today)!.amount)} ${goal.plan?.unit ?? ''}',
                   done: true,
+                  detailIcon: ActivityIcon(
+                    id: goal.iconId == 'goal'
+                        ? ActivityIconCatalog.guess(goal.name).id
+                        : goal.iconId,
+                    size: 14,
+                    color: context.appGreenText,
+                  ),
                   onToggle: () => goalStore.undoTodayAction(goal.id),
                   onDetails: () => showGoalActionCompletionRecord(
                     context,
@@ -614,45 +614,21 @@ class TodayPage extends StatelessWidget {
           : IconButton(
               tooltip: 'Quickly add a task',
               onPressed: () => _showQuickTaskCapture(context, lifeStore),
-              icon: const Icon(Icons.add_rounded, size: 22),
+              icon: Icon(Icons.add_rounded, size: 22, color: context.appText),
             ),
       child: Column(
         children: [
           _TodayHero(
             progress: ratio,
-            title: nextTitle,
+            titles: [
+              for (final action in goals) action.goal.name,
+              for (final task in pendingTasks) task.title,
+              if (remaining == 0) nextTitle,
+            ],
             remaining: remaining,
             scheduled: entries.length,
-            onSpeak: remaining == 0
-                ? null
-                : goals.isNotEmpty
-                ? () async {
-                    final completed = await _showGoalActionCheckIn(
-                      context,
-                      goalStore,
-                      goals.first.goal,
-                    );
-                    if (completed) {
-                      await _playCompletionFeedback(
-                        finishedDay: remaining == 1,
-                      );
-                    }
-                  }
-                : () async {
-                    final completed = await _showTaskCompletionCheckIn(
-                      context,
-                      lifeStore,
-                      pendingTasks.first,
-                      today,
-                    );
-                    if (completed) {
-                      await _playCompletionFeedback(
-                        finishedDay: remaining == 1,
-                      );
-                    }
-                  },
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           Expanded(
             child: wide
                 ? Row(
@@ -677,30 +653,55 @@ class TodayPage extends StatelessWidget {
                   )
                 : plan,
           ),
+          if (!wide) ...[
+            const SizedBox(height: 8),
+            _TodayQuickAddBar(store: lifeStore),
+          ],
         ],
       ),
     );
   }
 }
 
-class _TodayHero extends StatelessWidget {
+class _TodayHero extends StatefulWidget {
   const _TodayHero({
     required this.progress,
-    required this.title,
+    required this.titles,
     required this.remaining,
     required this.scheduled,
-    required this.onSpeak,
   });
   final double progress;
-  final String title;
+  final List<String> titles;
   final int remaining;
   final int scheduled;
-  final VoidCallback? onSpeak;
+
+  @override
+  State<_TodayHero> createState() => _TodayHeroState();
+}
+
+class _TodayHeroState extends State<_TodayHero> {
+  late final PageController _controller = PageController();
+  int _index = 0;
+
+  @override
+  void didUpdateWidget(covariant _TodayHero oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_index >= widget.titles.length) {
+      _index = widget.titles.length - 1;
+      if (_controller.hasClients) _controller.jumpToPage(_index);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minHeight: 108),
-    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+    height: 112,
+    padding: const EdgeInsets.fromLTRB(16, 13, 16, 9),
     decoration: BoxDecoration(
       gradient: LinearGradient(
         colors: [context.appRaised, context.appPanel],
@@ -719,50 +720,140 @@ class _TodayHero extends StatelessWidget {
     ),
     child: Row(
       children: [
-        _LifeProgressRing(value: progress, size: 62, stroke: 6),
-        const SizedBox(width: 22),
+        _LifeProgressRing(value: widget.progress, size: 60, stroke: 6),
+        const SizedBox(width: 16),
         Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                remaining == 0 ? 'All clear' : 'Next',
-                style: TextStyle(fontSize: 12, color: context.appMuted),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -.2,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: widget.titles.length,
+            onPageChanged: (value) => setState(() => _index = value),
+            itemBuilder: (context, index) => Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.remaining == 0 ? 'All clear' : 'Next',
+                  style: TextStyle(fontSize: 11, color: context.appMuted),
                 ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                '$remaining left · $scheduled scheduled',
-                style: TextStyle(fontSize: 11, color: context.appMuted),
-              ),
-            ],
+                const SizedBox(height: 3),
+                Text(
+                  widget.titles[index],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${widget.remaining} left · ${widget.scheduled} scheduled',
+                  style: TextStyle(fontSize: 10.5, color: context.appMuted),
+                ),
+                const SizedBox(height: 7),
+                Row(
+                  children: [
+                    for (
+                      var dot = 0;
+                      dot < widget.titles.length.clamp(1, 4);
+                      dot++
+                    )
+                      AnimatedContainer(
+                        duration: LifeMotion.quick,
+                        width: dot == _index ? 14 : 4,
+                        height: 3,
+                        margin: const EdgeInsets.only(right: 4),
+                        decoration: BoxDecoration(
+                          color: dot == _index
+                              ? Theme.of(context).colorScheme.primary
+                              : context.appBorder,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-        if (onSpeak != null) ...[
-          const SizedBox(width: 14),
-          Material(
+      ],
+    ),
+  );
+}
+
+class _TodayQuickAddBar extends StatefulWidget {
+  const _TodayQuickAddBar({required this.store});
+  final LifeStore store;
+
+  @override
+  State<_TodayQuickAddBar> createState() => _TodayQuickAddBarState();
+}
+
+class _TodayQuickAddBarState extends State<_TodayQuickAddBar> {
+  final _controller = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_saving || _controller.text.trim().isEmpty) return;
+    setState(() => _saving = true);
+    await _saveQuickTask(
+      context,
+      widget.store,
+      _controller.text,
+      closeAfterSave: false,
+    );
+    if (!mounted) return;
+    _controller.clear();
+    setState(() => _saving = false);
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 48,
+    decoration: BoxDecoration(
+      color: context.appPanel,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: context.appBorder),
+    ),
+    child: TextField(
+      key: const Key('today-inline-quick-add'),
+      controller: _controller,
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => _submit(),
+      decoration: InputDecoration(
+        filled: false,
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        hintText: 'Add something for today or later…',
+        prefixIcon: const Icon(Icons.add_rounded, size: 20),
+        suffixIcon: Padding(
+          padding: const EdgeInsets.all(5),
+          child: Material(
             color: Theme.of(context).colorScheme.primary,
             shape: const CircleBorder(),
             child: IconButton(
-              tooltip: 'Speak about what you completed',
-              onPressed: onSpeak,
-              color: Theme.of(context).colorScheme.onPrimary,
-              icon: const Icon(Icons.mic_none_rounded),
+              tooltip: 'Add task',
+              padding: EdgeInsets.zero,
+              onPressed: _saving ? null : _submit,
+              icon: _saving
+                  ? const SizedBox.square(
+                      dimension: 15,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.arrow_forward_rounded, size: 18),
+              color: Colors.white,
             ),
           ),
-        ],
-      ],
+        ),
+      ),
     ),
   );
 }
@@ -1060,6 +1151,22 @@ class _TasksPageState extends State<TasksPage> {
                   )
                 : ListView(
                     children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
+                        child: Row(
+                          children: [
+                            const Text(
+                              'To do',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              '${tasks.where((t) => _filter == 0 ? !t.isDoneOn(now) : !t.isCompleted).length}',
+                              style: TextStyle(color: context.appMuted),
+                            ),
+                          ],
+                        ),
+                      ),
                       for (final task in tasks.where(
                         (t) => _filter == 0 ? !t.isDoneOn(now) : !t.isCompleted,
                       ))
@@ -1075,6 +1182,7 @@ class _TasksPageState extends State<TasksPage> {
                             widget.goalStore,
                             task: task,
                           ),
+                          showMenu: true,
                         ),
                       if (tasks.any(
                         (t) => _filter == 0 ? t.isDoneOn(now) : t.isCompleted,
@@ -1130,6 +1238,7 @@ class _TasksPageState extends State<TasksPage> {
                                     ? now
                                     : task.completedAt ?? task.dueAt ?? now,
                               ),
+                              showMenu: true,
                             ),
                       ],
                     ],
@@ -2472,39 +2581,42 @@ class _TextTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
-    child: Wrap(
-      runSpacing: 6,
+    height: 42,
+    padding: const EdgeInsets.all(2),
+    decoration: BoxDecoration(
+      color: context.appRaised,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: context.appBorder),
+    ),
+    child: Row(
       children: [
         for (var index = 0; index < labels.length; index++)
-          InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: () => onSelected(index),
-            child: AnimatedContainer(
-              duration: MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : const Duration(milliseconds: 160),
-              margin: const EdgeInsets.only(right: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-              decoration: BoxDecoration(
-                color: selected == index
-                    ? context.appRaised
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(11),
+              onTap: () => onSelected(index),
+              child: AnimatedContainer(
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 160),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
                   color: selected == index
-                      ? context.appBorder
-                      : context.appBorder.withValues(alpha: .45),
+                      ? context.appSoftRed
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(11),
                 ),
-              ),
-              child: Text(
-                labels[index],
-                style: TextStyle(
-                  fontSize: 12,
-                  color: selected == index ? context.appText : context.appMuted,
-                  fontWeight: selected == index
-                      ? FontWeight.w600
-                      : FontWeight.w400,
+                child: Text(
+                  labels[index],
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: selected == index
+                        ? context.appDangerText
+                        : context.appMuted,
+                    fontWeight: selected == index
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -2587,6 +2699,9 @@ class _ActionTile extends StatelessWidget {
     this.onToggle,
     this.onTap,
     this.onDetails,
+    this.trailing,
+    this.tint,
+    this.detailIcon,
   });
   final IconData icon;
   final String title;
@@ -2595,11 +2710,14 @@ class _ActionTile extends StatelessWidget {
   final VoidCallback? onToggle;
   final VoidCallback? onTap;
   final VoidCallback? onDetails;
+  final Widget? trailing;
+  final Color? tint;
+  final Widget? detailIcon;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 6),
     child: Material(
-      color: context.appRaised.withValues(alpha: .86),
+      color: tint ?? context.appRaised.withValues(alpha: .86),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(9),
         side: BorderSide(color: context.appBorder.withValues(alpha: .82)),
@@ -2642,7 +2760,8 @@ class _ActionTile extends StatelessWidget {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(icon, size: 13, color: context.appMuted),
+                            detailIcon ??
+                                Icon(icon, size: 13, color: context.appMuted),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
@@ -2661,7 +2780,9 @@ class _ActionTile extends StatelessWidget {
                   ),
                 ),
               ),
-              if (onTap != null || onDetails != null)
+              if (trailing != null)
+                trailing!
+              else if (onTap != null || onDetails != null)
                 IconButton(
                   tooltip: onDetails == null ? 'Open' : 'Completion details',
                   onPressed: onDetails ?? onTap,
@@ -2689,6 +2810,8 @@ class _TaskTile extends StatelessWidget {
     this.onCompletionOpen,
     this.completionCheckIns = false,
     this.finishDayOnComplete = false,
+    this.showMenu = false,
+    this.highlight = false,
   });
   final LifeTask task;
   final LifeStore store;
@@ -2697,6 +2820,8 @@ class _TaskTile extends StatelessWidget {
   final VoidCallback? onCompletionOpen;
   final bool completionCheckIns;
   final bool finishDayOnComplete;
+  final bool showMenu;
+  final bool highlight;
   @override
   Widget build(BuildContext context) {
     final details = <String>[
@@ -2744,6 +2869,82 @@ class _TaskTile extends StatelessWidget {
           await store.completeTaskForDate(task, taskDate);
           await _playCompletionFeedback(finishedDay: finishDayOnComplete);
         },
+        detailIcon: ActivityIcon(
+          id: task.iconId == 'task'
+              ? ActivityIconCatalog.guess(task.title).id
+              : task.iconId,
+          size: 14,
+          color: context.appBlueText,
+        ),
+        tint: !context.isDarkMode
+            ? highlight
+                  ? context.appSoftBlue
+                  : showMenu
+                  ? context.appPanel
+                  : null
+            : null,
+        trailing: showMenu
+            ? PopupMenuButton<String>(
+                tooltip: 'Task actions',
+                icon: Icon(Icons.more_vert_rounded, color: context.appMuted),
+                onSelected: (value) async {
+                  if (value == 'edit') {
+                    onOpen?.call();
+                    return;
+                  }
+                  final taskDate = date ?? task.dueAt ?? DateTime.now();
+                  if (done) {
+                    if (date == null) {
+                      await store.toggleTask(task);
+                    } else {
+                      await store.toggleTaskForDate(task, date!);
+                    }
+                  } else {
+                    await store.completeTaskForDate(task, taskDate);
+                    await _playCompletionFeedback();
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'edit',
+                    padding: EdgeInsets.zero,
+                    child: Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      color: Theme.of(context).colorScheme.primary,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.edit_outlined,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Edit task',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'complete',
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(
+                        done
+                            ? Icons.undo_rounded
+                            : Icons.check_circle_outline_rounded,
+                      ),
+                      title: Text(done ? 'Mark incomplete' : 'Complete task'),
+                    ),
+                  ),
+                ],
+              )
+            : null,
       ),
     );
   }
@@ -2830,86 +3031,20 @@ Future<void> _showQuickTaskCapture(
 Future<void> _saveQuickTask(
   BuildContext context,
   LifeStore store,
-  String input,
-) async {
+  String input, {
+  bool closeAfterSave = true,
+}) async {
   final parsed = parseNaturalTask(input, DateTime.now());
   if (parsed.title.isEmpty) return;
-  await store.addTask(title: parsed.title, dueAt: parsed.dueAt);
-  if (context.mounted) Navigator.pop(context);
-}
-
-Future<bool> _showTaskCompletionCheckIn(
-  BuildContext context,
-  LifeStore store,
-  LifeTask task,
-  DateTime day,
-) => showTaskCompletionCheckIn(context, store, task, day);
-
-Future<bool> _showGoalActionCheckIn(
-  BuildContext context,
-  GoalStore store,
-  Goal goal,
-) async {
-  final note = TextEditingController();
-  final completed = await showModalBottomSheet<bool>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (context) => Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        2,
-        20,
-        MediaQuery.viewInsetsOf(context).bottom + 22,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Finish today\'s action',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            goal.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: context.appMuted),
-          ),
-          const SizedBox(height: 18),
-          TextField(
-            key: const Key('goal-completion-note'),
-            controller: note,
-            autofocus: true,
-            minLines: 3,
-            maxLines: 6,
-            decoration: InputDecoration(
-              labelText: 'How did you do it? (optional)',
-              hintText: 'Speak or type a useful progress note…',
-              suffixIcon: SpeechInputButton(controller: note),
-            ),
-          ),
-          const SizedBox(height: 14),
-          FilledButton.icon(
-            onPressed: () async {
-              await store.completeTodayAction(goal.id, note: note.text);
-              if (context.mounted) Navigator.pop(context, true);
-            },
-            icon: const Icon(Icons.check_rounded),
-            label: const Text('Complete and save'),
-          ),
-        ],
-      ),
-    ),
+  await store.addTask(
+    title: parsed.title,
+    dueAt: parsed.dueAt,
+    iconId: ActivityIconCatalog.guess(parsed.title).id,
   );
-  await Future<void>.delayed(const Duration(milliseconds: 300));
-  note.dispose();
-  return completed ?? false;
+  if (closeAfterSave && context.mounted) Navigator.pop(context);
 }
 
-Future<void> _playCompletionFeedback({required bool finishedDay}) async {
+Future<void> _playCompletionFeedback({bool finishedDay = false}) async {
   if (finishedDay) {
     await HapticFeedback.mediumImpact();
     await SystemSound.play(SystemSoundType.alert);
@@ -2933,13 +3068,53 @@ class _CalendarTile extends StatelessWidget {
       padding: const EdgeInsets.only(right: 24),
       child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFD35B63)),
     ),
-    child: _SurfaceTile(
-      icon: entry.kind == CalendarEntryKind.blockedTime
-          ? Icons.block_outlined
-          : Icons.event_outlined,
-      title: entry.title,
-      subtitle:
-          '${_time(entry.start)}–${_time(entry.end)}${entry.location.isEmpty ? '' : '  ·  ${entry.location}'}',
+    child: Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: context.isDarkMode ? context.appRaised : context.appSoftGreen,
+        borderRadius: BorderRadius.circular(9),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          child: Row(
+            children: [
+              ActivityIcon(
+                id: entry.id.startsWith('salah-')
+                    ? 'masjid'
+                    : entry.iconId == 'calendar'
+                    ? ActivityIconCatalog.guess(entry.title).id
+                    : entry.iconId,
+                size: 18,
+                color: context.appGreenText,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${_time(entry.start)}–${_time(entry.end)}${entry.location.isEmpty ? '' : '  ·  ${entry.location}'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 9.5, color: context.appMuted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     ),
   );
 }
@@ -3001,6 +3176,7 @@ class _TaskEditorState extends State<_TaskEditor> {
   late TaskRepeat _repeat = widget.task?.repeat ?? TaskRepeat.none;
   late String? _goalId = widget.task?.goalId;
   late String _assignee = widget.task?.assignee ?? '';
+  late String _iconId = widget.task?.iconId ?? 'task';
   late final List<LifeAttachment> _attachments = [...?widget.task?.attachments];
   bool _saving = false;
   String? _error;
@@ -3033,6 +3209,9 @@ class _TaskEditorState extends State<_TaskEditor> {
           location: _location.text,
           assignee: _assignee,
           attachments: _attachments,
+          iconId: _iconId == 'task'
+              ? ActivityIconCatalog.guess(_title.text).id
+              : _iconId,
         );
       } else {
         await widget.store.updateTask(
@@ -3047,6 +3226,9 @@ class _TaskEditorState extends State<_TaskEditor> {
             location: _location.text.trim(),
             assignee: _assignee,
             attachments: _attachments,
+            iconId: _iconId == 'task'
+                ? ActivityIconCatalog.guess(_title.text).id
+                : _iconId,
           ),
         );
       }
@@ -3095,6 +3277,26 @@ class _TaskEditorState extends State<_TaskEditor> {
                   controller: _title,
                   decoration: const InputDecoration(
                     hintText: 'What needs to be done?',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final chosen = await showActivityIconPicker(
+                        context,
+                        selectedId:
+                            _iconId == 'task' && _title.text.trim().isNotEmpty
+                            ? ActivityIconCatalog.guess(_title.text).id
+                            : _iconId,
+                      );
+                      if (chosen != null && mounted) {
+                        setState(() => _iconId = chosen);
+                      }
+                    },
+                    icon: ActivityIcon(id: _iconId),
+                    label: const Text('Choose icon'),
                   ),
                 ),
                 _label('Date and time'),

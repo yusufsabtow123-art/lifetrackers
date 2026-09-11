@@ -86,6 +86,7 @@ class LifeStore extends ChangeNotifier {
     String location = '',
     String assignee = '',
     List<LifeAttachment> attachments = const [],
+    String iconId = 'task',
   }) async {
     final now = _clock();
     final task = LifeTask(
@@ -100,6 +101,7 @@ class LifeStore extends ChangeNotifier {
       spaceId: activeSpaceId,
       assignee: assignee.trim(),
       attachments: attachments,
+      iconId: iconId,
     );
     _data = _data.copyWith(tasks: [..._data.tasks, task]);
     await _save();
@@ -318,6 +320,7 @@ class LifeStore extends ChangeNotifier {
     Set<int> repeatWeekdays = const <int>{},
     DateTime? repeatUntil,
     int? colorValue,
+    String iconId = 'calendar',
   }) async {
     final entry = CalendarEntry(
       id: _id('calendar', _clock()),
@@ -332,6 +335,7 @@ class LifeStore extends ChangeNotifier {
       repeatWeekdays: repeatWeekdays,
       repeatUntil: repeatUntil,
       colorValue: colorValue,
+      iconId: iconId,
     );
     _data = _data.copyWith(calendar: [..._data.calendar, entry]);
     await _save();

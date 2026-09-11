@@ -21,7 +21,7 @@ class LifeGoalsPage extends StatefulWidget {
 }
 
 class _LifeGoalsPageState extends State<LifeGoalsPage> {
-  bool _simplified = false;
+  bool _simplified = true;
   String? _category;
 
   static const _columns = <_GoalColumn>[
@@ -97,7 +97,7 @@ class _LifeGoalsPageState extends State<LifeGoalsPage> {
             const SizedBox(height: 10),
             Divider(color: context.appBorder),
           ],
-          SizedBox(height: compactSimplified ? 24 : 12),
+          SizedBox(height: compactSimplified ? 16 : 12),
           Expanded(
             child: Stack(
               children: [
@@ -267,7 +267,10 @@ class _SimplifiedHeader extends StatelessWidget {
       Row(
         children: [
           Expanded(
-            child: Text('Goals', style: Theme.of(context).textTheme.displaySmall),
+            child: Text(
+              'Goals',
+              style: Theme.of(context).textTheme.displaySmall,
+            ),
           ),
           _SimplifiedViewSwitcher(onViewChanged: onViewChanged),
         ],
@@ -290,24 +293,28 @@ class _SimplifiedViewSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 44,
+    width: 190,
+    height: 36,
     padding: const EdgeInsets.all(2),
     decoration: BoxDecoration(
       border: Border.all(color: context.appBorder),
       borderRadius: BorderRadius.circular(15),
     ),
     child: Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        _SimplifiedViewChoice(
-          label: 'Board',
-          selected: false,
-          onTap: () => onViewChanged(false),
+        Expanded(
+          child: _SimplifiedViewChoice(
+            label: 'Board',
+            selected: false,
+            onTap: () => onViewChanged(false),
+          ),
         ),
-        _SimplifiedViewChoice(
-          label: 'Simplified',
-          selected: true,
-          onTap: () => onViewChanged(true),
+        Expanded(
+          child: _SimplifiedViewChoice(
+            label: 'Simplified',
+            selected: true,
+            onTap: () => onViewChanged(true),
+          ),
         ),
       ],
     ),
@@ -327,19 +334,17 @@ class _SimplifiedViewChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: selected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+    color: selected ? context.appSoftRed : Colors.transparent,
     borderRadius: BorderRadius.circular(13),
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(13),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Text(
           label,
           style: TextStyle(
-            color: selected
-                ? Theme.of(context).colorScheme.onPrimary
-                : context.appMuted,
+            color: selected ? context.appDangerText : context.appMuted,
             fontSize: 13,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
           ),
@@ -926,18 +931,9 @@ class _SimplifiedGoals extends StatelessWidget {
       label: 'Ideas',
       statuses: {GoalStatus.ideas, GoalStatus.planned},
     ),
-    _SimplifiedGoalGroup(
-      label: 'In progress',
-      statuses: {GoalStatus.active},
-    ),
-    _SimplifiedGoalGroup(
-      label: 'Paused',
-      statuses: {GoalStatus.paused},
-    ),
-    _SimplifiedGoalGroup(
-      label: 'Finished',
-      statuses: {GoalStatus.completed},
-    ),
+    _SimplifiedGoalGroup(label: 'In progress', statuses: {GoalStatus.active}),
+    _SimplifiedGoalGroup(label: 'Paused', statuses: {GoalStatus.paused}),
+    _SimplifiedGoalGroup(label: 'Finished', statuses: {GoalStatus.completed}),
   ];
 
   @override
@@ -947,11 +943,13 @@ class _SimplifiedGoals extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 92),
       children: [
         for (var groupIndex = 0; groupIndex < _groups.length; groupIndex++) ...[
-          if (groupIndex > 0) const SizedBox(height: 25),
+          if (groupIndex > 0) const SizedBox(height: 16),
           _SimplifiedSectionHeader(
             group: _groups[groupIndex],
             count: goals
-                .where((goal) => _groups[groupIndex].statuses.contains(goal.status))
+                .where(
+                  (goal) => _groups[groupIndex].statuses.contains(goal.status),
+                )
                 .length,
           ),
           for (final goal in goals.where(
@@ -987,6 +985,22 @@ class _SimplifiedSectionHeader extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 4),
     child: Row(
       children: [
+        Icon(
+          switch (group.label) {
+            'Ideas' => Icons.lightbulb_outline_rounded,
+            'In progress' => Icons.radio_button_checked_rounded,
+            'Paused' => Icons.pause_circle_filled_rounded,
+            _ => Icons.check_circle_rounded,
+          },
+          size: 17,
+          color: switch (group.label) {
+            'Ideas' => context.appWarningText,
+            'In progress' => context.appBlueText,
+            'Paused' => context.appWarningText,
+            _ => context.appGreenText,
+          },
+        ),
+        const SizedBox(width: 7),
         Text(
           group.label,
           style: Theme.of(
@@ -996,7 +1010,9 @@ class _SimplifiedSectionHeader extends StatelessWidget {
         const SizedBox(width: 12),
         Text('$count', style: TextStyle(color: context.appMuted, fontSize: 13)),
         const SizedBox(width: 15),
-        Expanded(child: Divider(color: context.appBorder.withValues(alpha: .8))),
+        Expanded(
+          child: Divider(color: context.appBorder.withValues(alpha: .8)),
+        ),
       ],
     ),
   );
@@ -1020,53 +1036,105 @@ class _SimpleGoalRow extends StatelessWidget {
         ? 100
         : (goal.progress * 100).round();
     return Material(
-      color: Colors.transparent,
+      color: context.appPanel,
+      borderRadius: BorderRadius.circular(8),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         onLongPress: onOptions,
         child: Container(
-          height: 56,
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          margin: const EdgeInsets.only(bottom: 4),
           decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: context.appBorder.withValues(alpha: .32),
-              ),
-            ),
+            color: context.appRaised.withValues(alpha: .34),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: context.appBorder.withValues(alpha: .72)),
           ),
           child: Row(
             children: [
               Semantics(
                 label: '${goal.name}, $percentage percent complete',
                 child: Container(
-                  width: 27,
-                  height: 27,
+                  width: 20,
+                  height: 20,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: context.appText, width: 1.7),
+                    color: goal.status == GoalStatus.completed
+                        ? context.appSuccess
+                        : Colors.transparent,
+                    border: Border.all(
+                      color: goal.status == GoalStatus.completed
+                          ? context.appSuccess
+                          : context.appText,
+                      width: 1.5,
+                    ),
                   ),
+                  child: goal.status == GoalStatus.completed
+                      ? Icon(
+                          Icons.check_rounded,
+                          size: 14,
+                          color: context.appPanel,
+                        )
+                      : null,
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  goal.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w400),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      goal.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (percentage > 0 &&
+                        goal.status != GoalStatus.completed) ...[
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: LinearProgressIndicator(
+                                value: percentage / 100,
+                                minHeight: 4,
+                                backgroundColor: context.appBorder,
+                                color: goal.status == GoalStatus.paused
+                                    ? context.appPending
+                                    : Theme.of(context).colorScheme.secondary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$percentage%',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: context.appMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              if (percentage > 0) ...[
-                const SizedBox(width: 8),
-                Text(
-                  '$percentage%',
-                  style: TextStyle(fontSize: 13, color: context.appMuted),
+              IconButton(
+                tooltip: 'Goal actions',
+                onPressed: onOptions,
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.more_vert_rounded,
+                  size: 19,
+                  color: context.appMuted,
                 ),
-              ],
-              const SizedBox(width: 13),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 23,
-                color: context.appText,
               ),
             ],
           ),

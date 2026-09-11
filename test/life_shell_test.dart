@@ -62,7 +62,7 @@ void main() {
     await tester.pumpWidget(GoalApp(store: goals, lifeStore: tasks));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('today-task-count')), findsOneWidget);
+    expect(find.text('Daily task'), findsWidgets);
     expect(find.text('How did you do it?'), findsNothing);
     await tester.tap(find.byTooltip('Complete'));
     await tester.pumpAndSettle();
@@ -70,6 +70,7 @@ void main() {
     expect(tasks.tasks.single.isDoneOn(goals.today), isTrue);
     expect(find.text('How did you do it?'), findsNothing);
     expect(find.byKey(const ValueKey('complete')), findsOneWidget);
+    expect(find.text('Daily task'), findsNothing);
   });
 
   testWidgets('Today task arrow opens completion while its name still edits', (
@@ -171,14 +172,20 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('All'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Undated task'));
+    await tester.tap(find.byTooltip('Task actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit task'));
     await tester.pumpAndSettle();
     expect(find.text('No date'), findsOneWidget);
     await tester.enterText(
       find.byKey(const Key('task-title-field')),
       'Still undated',
     );
-    await tester.ensureVisible(find.byKey(const Key('task-save-button')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('task-save-button')),
+      260,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('task-save-button')));
     await tester.pumpAndSettle();
@@ -223,19 +230,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Today'), findsWidgets);
-    expect(find.text('Daily plan'), findsOneWidget);
+    expect(find.byKey(const Key('today-inline-quick-add')), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Goals').last);
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('new-goal-button')), findsOneWidget);
-    expect(find.byKey(const Key('mobile-goal-board')), findsOneWidget);
+    expect(find.byKey(const Key('simplified-new-goal-button')), findsOneWidget);
+    expect(find.byKey(const Key('simplified-goal-list')), findsOneWidget);
     expect(find.text('Memorize the Quran'), findsWidgets);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Calendar').last);
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Calendar options'), findsOneWidget);
+    expect(find.byTooltip('Schedule'), findsOneWidget);
     expect(find.byKey(const Key('calendar-day-timeline')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -338,6 +345,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Goals').last);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Board'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Simplified'));
     await tester.pumpAndSettle();
 
@@ -368,6 +377,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Goals').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Board'));
     await tester.pumpAndSettle();
 
     final board = find.byKey(const Key('mobile-goal-board'));
@@ -410,11 +421,7 @@ void main() {
     await tester.pumpAndSettle();
     final task = lifeStore.tasks.single;
 
-    expect(find.byKey(const Key('today-task-count')), findsOneWidget);
-    expect(
-      tester.widget<Text>(find.byKey(const Key('today-task-count'))).data,
-      '1',
-    );
+    expect(find.text('Daily editable task'), findsOneWidget);
     await tester.tap(
       find.descendant(
         of: find.byKey(ValueKey(task.id)),
@@ -423,13 +430,19 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(
-      tester.widget<Text>(find.byKey(const Key('today-task-count'))).data,
-      '0',
+      find.descendant(
+        of: find.byKey(ValueKey(task.id)),
+        matching: find.byIcon(Icons.circle_outlined),
+      ),
+      findsNothing,
     );
+    expect(find.text('Completed'), findsOneWidget);
 
     await tester.tap(find.text('Tasks').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Daily editable task'));
+    await tester.tap(find.byTooltip('Task actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit task'));
     await tester.pumpAndSettle();
     expect(find.text('Edit task'), findsOneWidget);
     expect(
@@ -443,7 +456,11 @@ void main() {
       find.byKey(const Key('task-title-field')),
       'Edited daily task',
     );
-    await tester.ensureVisible(find.byKey(const Key('task-save-button')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('task-save-button')),
+      260,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('task-save-button')));
     await tester.pumpAndSettle();
@@ -562,6 +579,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Goals').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Board'));
     await tester.pumpAndSettle();
 
     final source = tester.getCenter(find.text('Move this goal'));

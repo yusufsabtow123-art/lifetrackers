@@ -341,6 +341,7 @@ class Goal {
     this.startedAutomaticallyAt,
     this.showStartNotice = false,
     this.trashedAt,
+    this.iconId = 'goal',
   });
 
   final String id;
@@ -361,6 +362,7 @@ class Goal {
   final DateTime? startedAutomaticallyAt;
   final bool showStartNotice;
   final DateTime? trashedAt;
+  final String iconId;
 
   bool get isTrashed => trashedAt != null;
 
@@ -405,6 +407,7 @@ class Goal {
     DateTime? trashedAt,
     bool clearTrashedAt = false,
     DateTime? updatedAt,
+    String? iconId,
   }) => Goal(
     id: id,
     name: name ?? this.name,
@@ -427,5 +430,6 @@ class Goal {
         : startedAutomaticallyAt ?? this.startedAutomaticallyAt,
     showStartNotice: showStartNotice ?? this.showStartNotice,
     trashedAt: clearTrashedAt ? null : trashedAt ?? this.trashedAt,
+    iconId: iconId ?? this.iconId,
   );
 }
