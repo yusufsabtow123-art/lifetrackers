@@ -15,11 +15,13 @@ class SpeechInputButton extends StatelessWidget {
     required this.controller,
     this.tooltip = 'Speak instead of typing',
     this.service,
+    this.compact = false,
   });
 
   final TextEditingController controller;
   final String tooltip;
   final SpeechRecognitionService? service;
+  final bool compact;
 
   Future<void> _open(BuildContext context) async {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -46,6 +48,11 @@ class SpeechInputButton extends StatelessWidget {
   Widget build(BuildContext context) => IconButton(
     tooltip: tooltip,
     onPressed: () => _open(context),
+    padding: compact ? EdgeInsets.zero : null,
+    visualDensity: compact ? VisualDensity.compact : null,
+    constraints: compact
+        ? const BoxConstraints.tightFor(width: 28, height: 28)
+        : null,
     icon: Icon(Icons.mic_none_rounded, color: context.appMuted),
   );
 }

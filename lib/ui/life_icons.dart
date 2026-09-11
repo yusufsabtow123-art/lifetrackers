@@ -122,11 +122,13 @@ class _LifeGlyphPainter extends CustomPainter {
 
     switch (glyph) {
       case LifeGlyph.goals:
-        final rect = Rect.fromCircle(center: p(12, 12), radius: 8 * scale);
-        canvas.drawArc(rect, -.52, 1.52, false, paint);
-        canvas.drawArc(rect, 1.28, 1.62, false, paint);
-        canvas.drawArc(rect, 3.2, 1.35, false, paint);
-        canvas.drawCircle(p(18.6, 17.8), 1.35 * scale, Paint()..color = accent);
+        canvas.drawCircle(p(12, 12), 8 * scale, paint);
+        canvas.drawCircle(p(12, 12), 4.5 * scale, paint);
+        canvas.drawCircle(
+          p(12, 12),
+          1.45 * scale,
+          Paint()..color = selected ? accent : color,
+        );
       case LifeGlyph.today:
         canvas.drawRRect(rr(4, 5.5, 20, 20, 2.8), paint);
         canvas.drawLine(p(4, 10), p(20, 10), paint);
@@ -134,24 +136,13 @@ class _LifeGlyphPainter extends CustomPainter {
         canvas.drawLine(p(16, 3.8), p(16, 7), paint);
         canvas.drawCircle(p(12, 15), 1.35 * scale, Paint()..color = accent);
       case LifeGlyph.tasks:
-        canvas.drawCircle(
-          p(12, 12),
-          8 * scale,
-          selected ? (Paint()..color = accent) : paint,
-        );
+        canvas.drawCircle(p(12, 12), 8 * scale, paint);
         canvas.drawPath(
           Path()
             ..moveTo(8 * scale, 12 * scale)
             ..lineTo(11 * scale, 15 * scale)
             ..lineTo(17 * scale, 9 * scale),
-          selected
-              ? (Paint()
-                  ..color = const Color(0xFF192024)
-                  ..style = PaintingStyle.stroke
-                  ..strokeWidth = 1.6 * scale
-                  ..strokeCap = StrokeCap.round
-                  ..strokeJoin = StrokeJoin.round)
-              : paint,
+          paint,
         );
       case LifeGlyph.calendar:
         canvas.drawRRect(rr(4, 5.5, 20, 20, 2.8), paint);

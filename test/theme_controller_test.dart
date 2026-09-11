@@ -31,6 +31,10 @@ void main() {
     expect(controller.showAbandoned, isTrue);
     expect(repository.settings.showAbandoned, isTrue);
 
+    await controller.setUseSystemThemeColors(true);
+    expect(controller.useSystemThemeColors, isTrue);
+    expect(repository.settings.useSystemThemeColors, isTrue);
+
     final reloaded = AppSettingsController(repository);
     await reloaded.load();
     expect(reloaded.appearance, AppAppearance.dark);
@@ -38,6 +42,7 @@ void main() {
     expect(reloaded.accentColor, AppAccentColor.rose);
     expect(reloaded.progressFormat, AppProgressFormat.amount);
     expect(reloaded.showAbandoned, isTrue);
+    expect(reloaded.useSystemThemeColors, isTrue);
   });
 
   test('expanded settings persist and restore together', () async {
@@ -119,6 +124,7 @@ void main() {
     expect(settings.showAbandoned, isTrue);
     expect(settings.accentColor, 'coral');
     expect(settings.progressFormat, 'both');
+    expect(settings.useSystemThemeColors, isFalse);
   });
 
   test('light theme uses the approved white semantic palette', () {

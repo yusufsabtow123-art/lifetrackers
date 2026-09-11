@@ -96,79 +96,85 @@ class SettingsPage extends StatelessWidget {
       builder: (context, _) => MediaQuery.sizeOf(context).width >= 820
           ? _desktopSettings(context, entries)
           : ListView(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 28),
               children: [
-                _ReferenceSettingRow(
-                  icon: Icons.light_mode_outlined,
-                  iconColor: context.isDarkMode ? null : AppColors.goldText,
-                  title: 'Appearance',
-                  value: settings.appearance.name,
-                  onTap: entries[0].onTap,
+                _ReferenceSettingsGroup(
+                  children: [
+                    _ReferenceSettingRow(
+                      icon: Icons.light_mode_outlined,
+                      iconColor: context.isDarkMode
+                          ? null
+                          : const Color(0xFFF4AD00),
+                      title: 'Appearance',
+                      value: settings.appearance == AppAppearance.system
+                          ? 'System'
+                          : settings.appearance.label,
+                      onTap: entries[0].onTap,
+                    ),
+                    _ReferenceSettingRow(
+                      icon: Icons.notifications_rounded,
+                      iconColor: context.isDarkMode ? null : AppColors.coral,
+                      title: 'Notifications',
+                      value: settings.notificationsEnabled ? 'On' : 'Off',
+                      onTap: entries[4].onTap,
+                    ),
+                    _ReferenceSettingRow(
+                      icon: Icons.mosque_outlined,
+                      iconColor: context.isDarkMode
+                          ? null
+                          : AppColors.lightGreen,
+                      title: 'Calendar',
+                      value: settings.salahEnabled ? 'Salah on' : 'Salah off',
+                      onTap: entries[1].onTap,
+                    ),
+                    _ReferenceSettingRow(
+                      icon: Icons.storage_rounded,
+                      iconColor: context.isDarkMode ? null : AppColors.blue,
+                      title: 'Data',
+                      value: 'On this device',
+                      onTap: entries[7].onTap,
+                    ),
+                    _ReferenceSettingRow(
+                      icon: Icons.accessibility_new_rounded,
+                      iconColor: context.isDarkMode ? null : context.appMuted,
+                      title: 'Accessibility',
+                      value: 'Uses device settings',
+                      onTap: () => _open(
+                        context,
+                        'Accessibility',
+                        const _AccessibilitySettings(),
+                      ),
+                    ),
+                  ],
                 ),
-                _ReferenceSettingRow(
-                  icon: Icons.notifications_outlined,
-                  iconColor: context.isDarkMode ? null : AppColors.coralText,
-                  title: 'Notifications',
-                  value: settings.notificationsEnabled ? 'On' : 'Off',
-                  onTap: entries[4].onTap,
+                const SizedBox(height: 14),
+                _ReferenceSettingsGroup(
+                  header: 'Goals & device',
+                  children: [
+                    _ReferenceSettingRow(
+                      icon: Icons.track_changes_rounded,
+                      title: 'Board and categories',
+                      value: 'Customize your goals',
+                      onTap: entries[2].onTap,
+                    ),
+                    _ReferenceSettingRow(
+                      icon: Icons.bar_chart_rounded,
+                      title: 'Opened goals',
+                      value: 'See your progress',
+                      onTap: entries[3].onTap,
+                    ),
+                    _ReferenceSettingRow(
+                      icon: Icons.grid_view_outlined,
+                      title: 'Android widgets',
+                      value: 'Add to your home screen',
+                      onTap: entries[6].onTap,
+                    ),
+                  ],
                 ),
-                _ReferenceSettingRow(
-                  icon: Icons.calendar_today_outlined,
-                  iconColor: context.isDarkMode ? null : AppColors.greenText,
-                  title: 'Calendar',
-                  value: settings.salahEnabled ? 'Salah on' : 'Salah off',
-                  onTap: entries[1].onTap,
-                ),
-                _ReferenceSettingRow(
-                  icon: Icons.folder_outlined,
-                  iconColor: context.isDarkMode ? null : AppColors.blueText,
-                  title: 'Data',
-                  value: 'On this device',
-                  onTap: entries[7].onTap,
-                ),
-                _ReferenceSettingRow(
-                  icon: Icons.accessibility_new_rounded,
-                  iconColor: context.isDarkMode ? null : AppColors.blueText,
-                  title: 'Accessibility',
-                  value: 'Uses device settings',
-                  onTap: () => _open(
-                    context,
-                    'Accessibility',
-                    const _AccessibilitySettings(),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Goals & device',
-                  style: TextStyle(fontSize: 12, color: context.appMuted),
-                ),
-                const SizedBox(height: 8),
-                _ReferenceSettingRow(
-                  icon: entries[2].icon,
-                  iconColor: context.isDarkMode ? null : AppColors.coralText,
-                  title: 'Board and categories',
-                  value: '',
-                  onTap: entries[2].onTap,
-                ),
-                _ReferenceSettingRow(
-                  icon: entries[3].icon,
-                  iconColor: context.isDarkMode ? null : AppColors.blueText,
-                  title: 'Opened goals',
-                  value: '',
-                  onTap: entries[3].onTap,
-                ),
-                _ReferenceSettingRow(
-                  icon: entries[6].icon,
-                  iconColor: context.isDarkMode ? null : AppColors.blueText,
-                  title: 'Android widgets',
-                  value: '',
-                  onTap: entries[6].onTap,
-                ),
-                const SizedBox(height: 28),
-                Text(
-                  'Private by default · Saved automatically',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: context.appMuted),
+                const SizedBox(height: 14),
+                _InfoPanel(
+                  icon: Icons.shield_outlined,
+                  text: 'Private by default · Saved automatically',
                 ),
               ],
             ),
@@ -285,7 +291,7 @@ class SettingsPage extends StatelessWidget {
           appBar: AppBar(title: Text(title)),
           body: SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 36),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 28),
               child: Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
@@ -299,6 +305,41 @@ class SettingsPage extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ReferenceSettingsGroup extends StatelessWidget {
+  const _ReferenceSettingsGroup({required this.children, this.header});
+  final List<Widget> children;
+  final String? header;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: context.appPanel,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: context.appBorder),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (header != null)
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 9, 12, 8),
+            color: context.appRaised.withValues(alpha: .7),
+            child: Text(
+              header!,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+          ),
+        for (var index = 0; index < children.length; index++) ...[
+          children[index],
+          if (index != children.length - 1)
+            Divider(height: 1, color: context.appBorder),
+        ],
+      ],
+    ),
+  );
 }
 
 class _ReferenceSettingRow extends StatelessWidget {
@@ -315,36 +356,80 @@ class _ReferenceSettingRow extends StatelessWidget {
   final VoidCallback onTap;
   final Color? iconColor;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 2),
-    child: Material(
-      color: context.appPanel,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          child: Row(
-            children: [
-              Icon(icon, size: 19, color: iconColor ?? context.appText),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(title, style: const TextStyle(fontSize: 14)),
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 23, color: iconColor ?? context.appMuted),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (value.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      value,
+                      style: TextStyle(fontSize: 11.5, color: context.appMuted),
+                    ),
+                  ],
+                ],
               ),
-              if (value.isNotEmpty)
-                Text(
-                  value[0].toUpperCase() + value.substring(1),
-                  style: TextStyle(fontSize: 12, color: context.appMuted),
-                ),
-              const SizedBox(width: 8),
-              Icon(Icons.chevron_right, size: 16, color: context.appMuted),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: context.appMuted,
+            ),
+          ],
         ),
       ),
     ),
   );
+}
+
+class _InfoPanel extends StatelessWidget {
+  const _InfoPanel({required this.icon, required this.text, this.color});
+  final IconData icon;
+  final String text;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolved = color ?? context.appMuted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: context.appRaised.withValues(alpha: .64),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.appBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: resolved),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 11.5, color: resolved),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SettingsEntry {
@@ -497,17 +582,213 @@ class _AppearancePreview extends StatelessWidget {
   );
 }
 
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({required this.children});
+class _ReferenceSection extends StatelessWidget {
+  const _ReferenceSection({required this.children, this.title, this.tint});
   final List<Widget> children;
+  final String? title;
+  final Color? tint;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: tint ?? context.appPanel,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: context.appBorder),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (title != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 7),
+            child: Text(
+              title!,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+          ),
+        for (var index = 0; index < children.length; index++) ...[
+          children[index],
+          if (index != children.length - 1)
+            Divider(height: 1, color: context.appBorder),
+        ],
+      ],
+    ),
+  );
+}
+
+class _ReferenceActionRow extends StatelessWidget {
+  const _ReferenceActionRow({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.value,
+    this.onTap,
+    this.trailing,
+    this.iconColor,
+    this.enabled = true,
+  });
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final String? value;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+  final Color? iconColor;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: enabled ? onTap : null,
+    child: Opacity(
+      opacity: enabled ? 1 : .45,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+        child: Row(
+          children: [
+            Icon(icon, size: 23, color: iconColor ?? context.appBlueText),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.2,
+                        color: context.appMuted,
+                      ),
+                    ),
+                  ],
+                  if (value != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      value!,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: context.appBlueText,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            trailing ??
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: context.appBlueText,
+                ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _ReferenceToggleRow extends StatelessWidget {
+  const _ReferenceToggleRow({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+    this.iconColor,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) => _ReferenceActionRow(
+    icon: icon,
+    iconColor: iconColor,
+    title: title,
+    subtitle: subtitle,
+    enabled: onChanged != null,
+    trailing: Switch(value: value, onChanged: onChanged),
+    onTap: onChanged == null ? null : () => onChanged!(!value),
+  );
+}
+
+class _ReferenceChoiceBox extends StatelessWidget {
+  const _ReferenceChoiceBox({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.iconBackground,
+  });
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color? iconBackground;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(9),
+      child: AnimatedContainer(
+        duration: LifeMotion.quick,
+        height: 132,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 11),
+        decoration: BoxDecoration(
+          color: selected ? context.appSoftRed : context.appPanel,
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(
+            color: selected ? AppColors.coral : context.appBorder,
+            width: selected ? 1.4 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 48,
+              height: 42,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: iconBackground ?? Colors.transparent,
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Icon(
+                icon,
+                size: 30,
+                color: selected ? AppColors.coral : context.appText,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 7),
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              size: 24,
+              color: selected ? AppColors.coral : context.appBlueText,
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -520,26 +801,233 @@ class _AppearanceSettings extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: settings,
-    builder: (context, _) => _SettingsCard(
+    builder: (context, _) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Color mode', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        _ReferenceSection(
+          title: 'Color mode',
           children: [
-            for (final appearance in const [
-              AppAppearance.light,
-              AppAppearance.dark,
-            ])
-              ChoiceChip(
-                key: Key('appearance-${appearance.name}'),
-                selected: settings.appearance == appearance,
-                avatar: Icon(appearance.icon, size: 18),
-                label: Text(appearance.label),
-                onSelected: (_) => settings.setAppearance(appearance),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(9, 4, 9, 10),
+              child: Row(
+                children: [
+                  _ReferenceChoiceBox(
+                    key: const Key('appearance-light'),
+                    icon: Icons.light_mode_rounded,
+                    label: 'Light',
+                    selected: settings.appearance == AppAppearance.light,
+                    onTap: () => settings.setAppearance(AppAppearance.light),
+                  ),
+                  const SizedBox(width: 8),
+                  _ReferenceChoiceBox(
+                    key: const Key('appearance-dark'),
+                    icon: Icons.dark_mode_rounded,
+                    label: 'Dark',
+                    selected: settings.appearance == AppAppearance.dark,
+                    iconBackground: const Color(0xFF0B1731),
+                    onTap: () => settings.setAppearance(AppAppearance.dark),
+                  ),
+                  const SizedBox(width: 8),
+                  _ReferenceChoiceBox(
+                    key: const Key('appearance-system'),
+                    icon: Icons.desktop_windows_outlined,
+                    label: 'System',
+                    selected: settings.appearance == AppAppearance.system,
+                    onTap: () => settings.setAppearance(AppAppearance.system),
+                  ),
+                ],
               ),
+            ),
           ],
+        ),
+        const SizedBox(height: 12),
+        _ReferenceSection(
+          title: 'Theme preview',
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
+              child: _ThemePreviewCard(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _ReferenceSection(
+          children: [
+            _ReferenceToggleRow(
+              icon: Icons.palette_outlined,
+              title: 'Use system theme colors',
+              subtitle: "Match Android's dynamic colors where available.",
+              value: settings.useSystemThemeColors,
+              onChanged: settings.setUseSystemThemeColors,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _InfoPanel(
+          icon: Icons.info_outline_rounded,
+          color: AppColors.blueText,
+          text:
+              "You can change your theme at any time. This affects the app's colors and appearance across all screens.",
+        ),
+      ],
+    ),
+  );
+}
+
+class _ThemePreviewCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: context.appPanel,
+      borderRadius: BorderRadius.circular(9),
+      border: Border.all(color: context.appBorder),
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: context.appSoftBlue,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: const Icon(Icons.eco_rounded, color: AppColors.blue),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Life Tracker',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Track progress, build a better you',
+                    style: TextStyle(fontSize: 11, color: AppColors.blueText),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.blueText),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _PreviewTag(
+              color: AppColors.softBlue,
+              icon: Icons.track_changes_rounded,
+              title: 'Goal',
+              subtitle: 'On track',
+              foreground: AppColors.blueText,
+            ),
+            const SizedBox(width: 7),
+            _PreviewTag(
+              color: AppColors.softRed,
+              icon: Icons.check_box_rounded,
+              title: 'Task',
+              subtitle: 'Due today',
+              foreground: AppColors.coralText,
+            ),
+            const SizedBox(width: 7),
+            _PreviewTag(
+              color: AppColors.softGreen,
+              icon: Icons.mosque_outlined,
+              title: 'Salah',
+              subtitle: 'Protected',
+              foreground: AppColors.greenText,
+            ),
+          ],
+        ),
+        const SizedBox(height: 9),
+        const _PreviewBanner(),
+      ],
+    ),
+  );
+}
+
+class _PreviewTag extends StatelessWidget {
+  const _PreviewTag({
+    required this.color,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.foreground,
+  });
+  final Color color;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color foreground;
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: foreground),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: foreground,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 9.5, color: foreground),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _PreviewBanner extends StatelessWidget {
+  const _PreviewBanner();
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: context.appSoftAmber,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: const Row(
+      children: [
+        Icon(Icons.description_outlined, color: AppColors.goldText),
+        SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'A calmer, more consistent you',
+                style: TextStyle(fontSize: 11.5, color: AppColors.goldText),
+              ),
+              Text(
+                'Small steps make big progress.',
+                style: TextStyle(fontSize: 10.5, color: AppColors.blueText),
+              ),
+            ],
+          ),
         ),
       ],
     ),
@@ -553,26 +1041,37 @@ class _AccessibilitySettings extends StatelessWidget {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final scale = media.textScaler.scale(1);
-    return _SettingsCard(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.text_fields_rounded),
-          title: const Text('Text size'),
-          subtitle: const Text(
-            'Life Tracker follows the text size selected on this device.',
-          ),
-          trailing: Text('${(scale * 100).round()}%'),
+        _ReferenceSection(
+          children: [
+            _ReferenceActionRow(
+              icon: Icons.text_fields_rounded,
+              title: 'Text size',
+              value: '${(scale * 100).round()}%',
+              subtitle: "Life Tracker follows your device's text size setting.",
+            ),
+          ],
         ),
-        const Divider(),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.motion_photos_off_outlined),
-          title: const Text('Reduced motion'),
-          subtitle: const Text(
-            'Animations become simpler when the device requests reduced motion.',
-          ),
-          trailing: Text(media.disableAnimations ? 'On' : 'Off'),
+        const SizedBox(height: 12),
+        _ReferenceSection(
+          children: [
+            _ReferenceActionRow(
+              icon: Icons.motion_photos_off_outlined,
+              title: 'Reduced motion',
+              value: media.disableAnimations ? 'On' : 'Off',
+              subtitle:
+                  'Animations will be simplified when Android requests reduced motion.',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _InfoPanel(
+          icon: Icons.info_outline_rounded,
+          color: AppColors.blueText,
+          text:
+              'These accessibility settings help make Life Tracker more comfortable to use for everyone.',
         ),
       ],
     );
@@ -611,79 +1110,201 @@ class _BoardSettings extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: settings,
-    builder: (context, _) => _SettingsCard(
+    builder: (context, _) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Use categories'),
-          subtitle: const Text(
-            'Master switch for Faith, Health, Mind, Body, Finances, and other areas.',
-          ),
-          secondary: const Icon(Icons.category_outlined),
-          value: settings.categoriesEnabled,
-          onChanged: settings.setCategoriesEnabled,
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Move between categories by dragging'),
-          subtitle: const Text(
-            'Drop a card on a category at the top. Its workflow column stays the same.',
-          ),
-          secondary: const Icon(Icons.drag_indicator_rounded),
-          value: settings.categoryDragEnabled,
-          onChanged: settings.categoriesEnabled
-              ? settings.setCategoryDragEnabled
-              : null,
-        ),
-        const Divider(),
-        Text(
-          'Categories shown',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 6),
-        for (final category in GoalCategories.builtIn)
-          CheckboxListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: Text(category),
-            value: settings.data.enabledCategories.contains(category),
-            onChanged: settings.categoriesEnabled
-                ? (value) =>
-                      settings.setCategoryEnabled(category, value ?? false)
-                : null,
-          ),
-        const Divider(),
-        Text(
-          'Progress display',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 9),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        _ReferenceSection(
           children: [
-            for (final format in AppProgressFormat.values)
-              ChoiceChip(
-                key: Key('progress-format-${format.name}'),
-                selected: settings.progressFormat == format,
-                label: Text(format.label),
-                onSelected: (_) => settings.setProgressFormat(format),
+            _ReferenceToggleRow(
+              icon: Icons.format_list_bulleted_rounded,
+              title: 'Use categories',
+              subtitle: 'Organize your goals by category on the Home screen.',
+              value: settings.categoriesEnabled,
+              onChanged: settings.setCategoriesEnabled,
+            ),
+            _ReferenceToggleRow(
+              icon: Icons.swap_vert_rounded,
+              title: 'Move between categories by dragging',
+              subtitle: 'Reorder goals by dragging them between categories.',
+              value: settings.categoryDragEnabled,
+              onChanged: settings.categoriesEnabled
+                  ? settings.setCategoryDragEnabled
+                  : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _ReferenceSection(
+          title: 'Categories',
+          children: [
+            for (final category in GoalCategories.builtIn.take(5))
+              _CategoryRow(
+                category: category,
+                value: settings.data.enabledCategories.contains(category),
+                onChanged: settings.categoriesEnabled
+                    ? (value) => settings.setCategoryEnabled(category, value)
+                    : null,
               ),
           ],
         ),
         const SizedBox(height: 12),
-        SwitchListTile(
-          key: const Key('show-abandoned-switch'),
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Show Abandoned'),
-          subtitle: const Text(
-            'Off by default. Regular columns are hidden from their eye icon.',
-          ),
-          secondary: const Icon(Icons.archive_outlined),
-          value: settings.showAbandoned,
-          onChanged: settings.setShowAbandoned,
+        _ReferenceSection(
+          title: 'Progress display',
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 2, 8, 9),
+              child: Row(
+                children: [
+                  for (
+                    var index = 0;
+                    index < AppProgressFormat.values.length;
+                    index++
+                  ) ...[
+                    Expanded(
+                      child: _CompactChoice(
+                        key: Key(
+                          'progress-format-${AppProgressFormat.values[index].name}',
+                        ),
+                        icon: switch (AppProgressFormat.values[index]) {
+                          AppProgressFormat.percentage => Icons.percent_rounded,
+                          AppProgressFormat.amount => Icons.bar_chart_rounded,
+                          AppProgressFormat.both => Icons.query_stats_rounded,
+                        },
+                        label: AppProgressFormat.values[index].label,
+                        selected:
+                            settings.progressFormat ==
+                            AppProgressFormat.values[index],
+                        onTap: () => settings.setProgressFormat(
+                          AppProgressFormat.values[index],
+                        ),
+                      ),
+                    ),
+                    if (index != AppProgressFormat.values.length - 1)
+                      const SizedBox(width: 6),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _ReferenceSection(
+          children: [
+            _ReferenceToggleRow(
+              key: const Key('show-abandoned-switch'),
+              icon: Icons.inventory_2_outlined,
+              title: 'Show abandoned goals',
+              subtitle: "Display goals you've abandoned in your lists.",
+              value: settings.showAbandoned,
+              onChanged: settings.setShowAbandoned,
+            ),
+          ],
         ),
       ],
+    ),
+  );
+}
+
+class _CategoryRow extends StatelessWidget {
+  const _CategoryRow({
+    required this.category,
+    required this.value,
+    required this.onChanged,
+  });
+  final String category;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, color) = switch (category) {
+      'Faith' => (Icons.dark_mode_outlined, AppColors.blueText),
+      'Health' => (Icons.favorite_outline_rounded, AppColors.coral),
+      'Mind' => (Icons.psychology_outlined, const Color(0xFFE2A200)),
+      'Body' => (Icons.fitness_center_rounded, AppColors.lightGreen),
+      'Finances' => (Icons.monetization_on_outlined, AppColors.blue),
+      _ => (Icons.label_outline_rounded, AppColors.blueText),
+    };
+    return InkWell(
+      onTap: onChanged == null ? null : () => onChanged!(!value),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 21),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                category,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Checkbox(
+              value: value,
+              onChanged: onChanged == null
+                  ? null
+                  : (checked) => onChanged!(checked ?? false),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactChoice extends StatelessWidget {
+  const _CompactChoice({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(8),
+    child: AnimatedContainer(
+      duration: LifeMotion.quick,
+      height: 94,
+      decoration: BoxDecoration(
+        color: selected ? context.appSoftRed : context.appPanel,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: selected ? AppColors.coral : context.appBorder,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            color: selected ? AppColors.coral : context.appBlueText,
+            size: 25,
+          ),
+          const SizedBox(height: 5),
+          Text(
+            label,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 10.5, height: 1.05),
+          ),
+          const SizedBox(height: 5),
+          Icon(
+            selected ? Icons.radio_button_checked : Icons.radio_button_off,
+            color: selected ? AppColors.coral : context.appBlueText,
+            size: 21,
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -695,37 +1316,74 @@ class _OpenedGoalSettings extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: settings,
-    builder: (context, _) => _SettingsCard(
+    builder: (context, _) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Default view inside a goal',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 5),
-        const Text(
-          'Simple shows today, progress, and reminders. Detailed also shows '
-          'the amount target, checklist, schedule health, and history.',
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
+        _ReferenceSection(
+          title: 'Default view inside a goal',
           children: [
-            for (final view in GoalDetailView.values)
-              ChoiceChip(
-                selected: settings.defaultGoalDetailView == view,
-                label: Text(view.label),
-                onSelected: (_) => settings.setDefaultGoalDetailView(view),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Choose how a goal opens. This affects what you see first when you tap a goal from your lists.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.3,
+                      color: context.appMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 11),
+                  Row(
+                    children: [
+                      _ReferenceChoiceBox(
+                        icon: Icons.short_text_rounded,
+                        label: 'Simple',
+                        selected:
+                            settings.defaultGoalDetailView ==
+                            GoalDetailView.simple,
+                        onTap: () => settings.setDefaultGoalDetailView(
+                          GoalDetailView.simple,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _ReferenceChoiceBox(
+                        icon: Icons.format_list_bulleted_rounded,
+                        label: 'Detailed',
+                        selected:
+                            settings.defaultGoalDetailView ==
+                            GoalDetailView.detailed,
+                        onTap: () => settings.setDefaultGoalDetailView(
+                          GoalDetailView.detailed,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
+            ),
           ],
         ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Remember each goal’s view'),
-          subtitle: const Text(
-            'One goal can remain Detailed without changing all other goals.',
-          ),
-          value: settings.rememberGoalDetailView,
-          onChanged: settings.setRememberGoalDetailView,
+        const SizedBox(height: 12),
+        _ReferenceSection(
+          children: [
+            _ReferenceToggleRow(
+              icon: Icons.history_rounded,
+              title: "Remember each goal's view",
+              subtitle:
+                  'Life Tracker will open each goal in the same view you last used for that goal.',
+              value: settings.rememberGoalDetailView,
+              onChanged: settings.setRememberGoalDetailView,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _InfoPanel(
+          icon: Icons.info_outline_rounded,
+          color: AppColors.blueText,
+          text: 'You can always switch views inside a goal at any time.',
         ),
       ],
     ),
@@ -740,176 +1398,210 @@ class _CalendarSettings extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: settings,
-    builder: (context, _) => _SettingsCard(
+    builder: (context, _) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SwitchListTile(
-          key: const Key('salah-calendar-enabled'),
-          secondary: const Icon(Icons.mosque_outlined),
-          title: const Text('Protect Salah times'),
-          subtitle: const Text(
-            'Show Fajr, Dhuhr, Asr, Maghrib, and Isha as protected calendar blocks.',
-          ),
-          value: settings.salahEnabled,
-          onChanged: (value) {
-            if (value) lifeStore?.setShowBlockedTimes(true);
-            settings.setSalahEnabled(value);
-          },
-        ),
-        ListTile(
-          enabled: settings.salahEnabled,
-          leading: const Icon(Icons.location_on_outlined),
-          title: const Text('Prayer location'),
-          subtitle: Text(
-            '${settings.data.salahLocationName}\n${settings.data.salahTimeZone}',
-          ),
-          isThreeLine: true,
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: settings.salahEnabled
-              ? () => _editSalahLocation(context, settings)
-              : null,
-        ),
-        ListTile(
-          enabled: settings.salahEnabled,
-          leading: const Icon(Icons.my_location_rounded),
-          title: const Text('Use current location'),
-          subtitle: const Text(
-            'Ask Android once, then calculate prayer times locally.',
-          ),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: settings.salahEnabled
-              ? () => _useCurrentSalahLocation(context, settings)
-              : null,
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: DropdownButtonFormField<SalahCalculationMethod>(
-            isExpanded: true,
-            initialValue: settings.salahCalculationMethod,
-            decoration: const InputDecoration(
-              labelText: 'Calculation method',
-              prefixIcon: Icon(Icons.calculate_outlined),
-            ),
-            items: [
-              for (final method in SalahCalculationMethod.values)
-                DropdownMenuItem(value: method, child: Text(method.label)),
-            ],
-            onChanged: settings.salahEnabled
-                ? (value) {
-                    if (value != null) {
-                      settings.setSalahCalculationMethod(value);
-                    }
-                  }
-                : null,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: DropdownButtonFormField<SalahAsrMethod>(
-            isExpanded: true,
-            initialValue: settings.salahAsrMethod,
-            decoration: const InputDecoration(
-              labelText: 'Asr convention',
-              prefixIcon: Icon(Icons.schedule_outlined),
-            ),
-            items: [
-              for (final method in SalahAsrMethod.values)
-                DropdownMenuItem(value: method, child: Text(method.label)),
-            ],
-            onChanged: settings.salahEnabled
-                ? (value) {
-                    if (value != null) settings.setSalahAsrMethod(value);
-                  }
-                : null,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: DropdownButtonFormField<int>(
-            isExpanded: true,
-            initialValue: settings.data.salahBlockMinutes,
-            decoration: const InputDecoration(
-              labelText: 'Protected block duration',
-              prefixIcon: Icon(Icons.timelapse_outlined),
-            ),
-            items: const [
-              DropdownMenuItem(value: 15, child: Text('15 minutes')),
-              DropdownMenuItem(value: 30, child: Text('30 minutes')),
-              DropdownMenuItem(value: 45, child: Text('45 minutes')),
-              DropdownMenuItem(value: 60, child: Text('1 hour')),
-            ],
-            onChanged: settings.salahEnabled
-                ? (value) {
-                    if (value != null) settings.setSalahBlockMinutes(value);
-                  }
-                : null,
-          ),
-        ),
-        ExpansionTile(
-          leading: const Icon(Icons.tune_rounded),
-          title: const Text('Advanced calculation'),
-          subtitle: const Text('High-latitude rule and local minute offsets'),
+        _ReferenceSection(
+          title: 'Salah settings',
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: DropdownButtonFormField<SalahHighLatitudeRule>(
-                isExpanded: true,
-                initialValue: settings.salahHighLatitudeRule,
-                decoration: const InputDecoration(
-                  labelText: 'High-latitude rule',
-                ),
-                items: [
-                  for (final rule in SalahHighLatitudeRule.values)
-                    DropdownMenuItem(value: rule, child: Text(rule.label)),
-                ],
-                onChanged: settings.salahEnabled
-                    ? (value) {
-                        if (value != null) {
-                          settings.setSalahHighLatitudeRule(value);
-                        }
-                      }
-                    : null,
+            _ReferenceToggleRow(
+              key: const Key('salah-calendar-enabled'),
+              icon: Icons.shield_outlined,
+              iconColor: AppColors.lightGreen,
+              title: 'Protect Salah times',
+              subtitle:
+                  'Automatically block time for prayers in your calendar.',
+              value: settings.salahEnabled,
+              onChanged: (value) {
+                if (value) lifeStore?.setShowBlockedTimes(true);
+                settings.setSalahEnabled(value);
+              },
+            ),
+            _ReferenceActionRow(
+              icon: Icons.location_on_outlined,
+              title: 'Prayer location',
+              value: settings.data.salahLocationName,
+              enabled: settings.salahEnabled,
+              onTap: () => _editSalahLocation(context, settings),
+            ),
+            _ReferenceActionRow(
+              icon: Icons.my_location_rounded,
+              title: 'Use current location',
+              subtitle: 'Update location from this device',
+              enabled: settings.salahEnabled,
+              onTap: () => _useCurrentSalahLocation(context, settings),
+            ),
+            _ReferenceActionRow(
+              icon: Icons.calculate_outlined,
+              title: 'Calculation method',
+              value: _shortCalculationMethod(settings.salahCalculationMethod),
+              enabled: settings.salahEnabled,
+              onTap: () => _chooseSetting<SalahCalculationMethod>(
+                context,
+                title: 'Calculation method',
+                values: SalahCalculationMethod.values,
+                selected: settings.salahCalculationMethod,
+                label: (value) => value.label,
+                onSelected: settings.setSalahCalculationMethod,
               ),
             ),
-            for (final prayer in const [
-              'Fajr',
-              'Dhuhr',
-              'Asr',
-              'Maghrib',
-              'Isha',
-            ])
-              ListTile(
-                enabled: settings.salahEnabled,
-                title: Text('$prayer adjustment'),
-                subtitle: const Text('Use only to match your local masjid'),
-                trailing: DropdownButton<int>(
-                  value: settings.data.salahAdjustments[prayer] ?? 0,
-                  items: [
-                    for (final value in const [-10, -5, 0, 5, 10])
-                      DropdownMenuItem(
-                        value: value,
-                        child: Text(
-                          value == 0
-                              ? 'None'
-                              : '${value > 0 ? '+' : ''}$value min',
-                        ),
-                      ),
-                  ],
-                  onChanged: settings.salahEnabled
-                      ? (value) {
-                          if (value != null) {
-                            settings.setSalahAdjustment(prayer, value);
-                          }
-                        }
-                      : null,
-                ),
+            _ReferenceActionRow(
+              icon: Icons.schedule_outlined,
+              title: 'Asr method',
+              value: settings.salahAsrMethod == SalahAsrMethod.shafi
+                  ? 'Standard (Shafi‘i)'
+                  : 'Hanafi',
+              enabled: settings.salahEnabled,
+              onTap: () => _chooseSetting<SalahAsrMethod>(
+                context,
+                title: 'Asr method',
+                values: SalahAsrMethod.values,
+                selected: settings.salahAsrMethod,
+                label: (value) => value.label,
+                onSelected: settings.setSalahAsrMethod,
               ),
-            const SizedBox(height: 8),
+            ),
+            _ReferenceActionRow(
+              icon: Icons.timer_outlined,
+              title: 'Protected block duration',
+              value: '${settings.data.salahBlockMinutes} minutes',
+              enabled: settings.salahEnabled,
+              onTap: () => _chooseSetting<int>(
+                context,
+                title: 'Protected block duration',
+                values: const [15, 30, 45, 60],
+                selected: settings.data.salahBlockMinutes,
+                label: (value) => value == 60 ? '1 hour' : '$value minutes',
+                onSelected: settings.setSalahBlockMinutes,
+              ),
+            ),
+            _ReferenceActionRow(
+              icon: Icons.settings_outlined,
+              title: 'Advanced calculation',
+              value: 'High-latitude rule and local minute offsets',
+              enabled: settings.salahEnabled,
+              onTap: () => _openAdvancedSalah(context, settings),
+            ),
           ],
+        ),
+        const SizedBox(height: 12),
+        const _InfoPanel(
+          icon: Icons.info_outline_rounded,
+          color: AppColors.blueText,
+          text: 'Prayer blocks update daily and appear in Calendar.',
         ),
       ],
     ),
   );
 }
+
+String _shortCalculationMethod(SalahCalculationMethod method) =>
+    switch (method) {
+      SalahCalculationMethod.northAmerica => 'ISNA',
+      SalahCalculationMethod.muslimWorldLeague => 'Muslim World League',
+      SalahCalculationMethod.egyptian => 'Egyptian Authority',
+      SalahCalculationMethod.karachi => 'Karachi',
+      SalahCalculationMethod.ummAlQura => 'Umm al-Qura',
+    };
+
+Future<void> _chooseSetting<T>(
+  BuildContext context, {
+  required String title,
+  required List<T> values,
+  required T selected,
+  required String Function(T value) label,
+  required ValueChanged<T> onSelected,
+}) async {
+  final result = await showModalBottomSheet<T>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (context) => Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          for (final value in values)
+            ListTile(
+              leading: Icon(
+                value == selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                color: value == selected
+                    ? AppColors.coral
+                    : context.appBlueText,
+              ),
+              title: Text(label(value)),
+              onTap: () => Navigator.pop(context, value),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (result != null) onSelected(result);
+}
+
+Future<void> _openAdvancedSalah(
+  BuildContext context,
+  AppSettingsController settings,
+) => Navigator.of(context).push(
+  MaterialPageRoute<void>(
+    builder: (context) => Scaffold(
+      appBar: AppBar(title: const Text('Advanced calculation')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
+            _ReferenceSection(
+              children: [
+                _ReferenceActionRow(
+                  icon: Icons.public_rounded,
+                  title: 'High-latitude rule',
+                  value: settings.salahHighLatitudeRule.label,
+                  onTap: () => _chooseSetting<SalahHighLatitudeRule>(
+                    context,
+                    title: 'High-latitude rule',
+                    values: SalahHighLatitudeRule.values,
+                    selected: settings.salahHighLatitudeRule,
+                    label: (value) => value.label,
+                    onSelected: settings.setSalahHighLatitudeRule,
+                  ),
+                ),
+                for (final prayer in const [
+                  'Fajr',
+                  'Dhuhr',
+                  'Asr',
+                  'Maghrib',
+                  'Isha',
+                ])
+                  _ReferenceActionRow(
+                    icon: Icons.schedule_rounded,
+                    title: '$prayer adjustment',
+                    value:
+                        '${settings.data.salahAdjustments[prayer] ?? 0} minutes',
+                    onTap: () => _chooseSetting<int>(
+                      context,
+                      title: '$prayer adjustment',
+                      values: const [-10, -5, 0, 5, 10],
+                      selected: settings.data.salahAdjustments[prayer] ?? 0,
+                      label: (value) => value == 0
+                          ? 'None'
+                          : '${value > 0 ? '+' : ''}$value minutes',
+                      onSelected: (value) =>
+                          settings.setSalahAdjustment(prayer, value),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  ),
+);
 
 Future<void> _editSalahLocation(
   BuildContext context,
@@ -1076,149 +1768,173 @@ class _NotificationSettingsState extends State<_NotificationSettings> {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: settings,
-    builder: (context, _) => _SettingsCard(
+    builder: (context, _) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Allow reminders'),
-          subtitle: const Text('Master control for every goal notification.'),
-          secondary: const Icon(Icons.notifications_active_outlined),
-          value: settings.notificationsEnabled,
-          onChanged: _working ? null : _setEnabled,
-        ),
-        if (widget.notifications != null) ...[
-          _NotificationStatusTile(status: _status, loading: _working),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: _working ? null : _refresh,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Refresh status'),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: _working
-                    ? null
-                    : () => _run(
-                        (service) => service.sendTestNotification(),
-                        'Test notification sent.',
-                      ),
-                icon: const Icon(Icons.notifications_active_outlined),
-                label: const Text('Send test now'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _working
-                    ? null
-                    : () => _run(
-                        (service) => service.scheduleTestNotification(),
-                        'Test scheduled for one minute from now.',
-                      ),
-                icon: const Icon(Icons.schedule_send_outlined),
-                label: const Text('Test in 1 minute'),
-              ),
-              if (_status?.allowed == false)
-                TextButton.icon(
-                  onPressed: _working
-                      ? null
-                      : () => _run((service) async {
-                          await service.openNotificationSettings();
-                        }, 'Device notification settings opened.'),
-                  icon: const Icon(Icons.settings_outlined),
-                  label: const Text('Device settings'),
+        _ReferenceSection(
+          children: [
+            _ReferenceToggleRow(
+              icon: Icons.notifications_none_rounded,
+              iconColor: AppColors.lightGreen,
+              title: 'Allow reminders',
+              subtitle:
+                  'Get notified about your tasks, goals and daily review.',
+              value: settings.notificationsEnabled,
+              onChanged: _working ? null : _setEnabled,
+            ),
+            if (widget.notifications != null) ...[
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: _NotificationStatusTile(
+                  status: _status,
+                  loading: _working,
                 ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 2, 10, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: context.appSoftRed,
+                          foregroundColor: AppColors.coralText,
+                        ),
+                        onPressed: _working
+                            ? null
+                            : () => _run(
+                                (service) => service.sendTestNotification(),
+                                'Test notification sent.',
+                              ),
+                        icon: const Icon(Icons.send_outlined, size: 18),
+                        label: const Text('Send test now'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _working
+                            ? null
+                            : () => _run((service) async {
+                                await service.openNotificationSettings();
+                              }, 'Device notification settings opened.'),
+                        icon: const Icon(Icons.settings_outlined, size: 18),
+                        label: const Text('Device settings'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
-          ),
-          const Divider(height: 28),
-        ],
-        DropdownButtonFormField<DefaultReminderFrequency>(
-          initialValue: settings.defaultReminderFrequency,
-          decoration: const InputDecoration(labelText: 'Default frequency'),
-          items: [
-            for (final item in DefaultReminderFrequency.values)
-              DropdownMenuItem(value: item, child: Text(item.label)),
+            _ReferenceActionRow(
+              icon: Icons.notifications_none_rounded,
+              title: 'Default frequency',
+              value:
+                  settings.defaultReminderFrequency ==
+                      DefaultReminderFrequency.daily
+                  ? 'Daily'
+                  : settings.defaultReminderFrequency.label,
+              enabled: settings.notificationsEnabled,
+              onTap: () => _chooseSetting<DefaultReminderFrequency>(
+                context,
+                title: 'Default frequency',
+                values: DefaultReminderFrequency.values,
+                selected: settings.defaultReminderFrequency,
+                label: (value) => value.label,
+                onSelected: settings.setDefaultReminderFrequency,
+              ),
+            ),
+            _ReferenceActionRow(
+              icon: Icons.schedule_outlined,
+              title: 'Default reminder time',
+              value: settings.defaultReminderTime.format(context),
+              enabled: settings.notificationsEnabled,
+              onTap: () => _selectTime(
+                context,
+                settings.defaultReminderTime,
+                settings.setDefaultReminderTime,
+              ),
+            ),
           ],
-          onChanged: settings.notificationsEnabled
-              ? (value) {
-                  if (value != null) {
-                    settings.setDefaultReminderFrequency(value);
-                  }
-                }
-              : null,
         ),
-        const SizedBox(height: 10),
-        _TimeSettingTile(
-          title: 'Default reminder time',
-          value: settings.defaultReminderTime,
-          enabled: settings.notificationsEnabled,
-          onChanged: settings.setDefaultReminderTime,
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('End-of-day review'),
-          subtitle: const Text(
-            'One optional reminder for all unfinished actions.',
-          ),
-          value: settings.endOfDayReview,
-          onChanged: settings.notificationsEnabled
-              ? settings.setEndOfDayReview
-              : null,
-        ),
-        if (settings.endOfDayReview)
-          _TimeSettingTile(
-            title: 'Review time',
-            value: settings.endOfDayTime,
-            enabled: settings.notificationsEnabled,
-            onChanged: settings.setEndOfDayTime,
-          ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Quiet hours'),
-          subtitle: const Text(
-            'Delay reminders between your usual sleep and wake time.',
-          ),
-          value: settings.quietHoursEnabled,
-          onChanged: settings.notificationsEnabled
-              ? settings.setQuietHoursEnabled
-              : null,
-        ),
-        if (settings.quietHoursEnabled)
-          Row(
-            children: [
-              Expanded(
-                child: _TimeSettingTile(
-                  title: 'From',
-                  value: settings.quietStart,
-                  enabled: settings.notificationsEnabled,
-                  onChanged: settings.setQuietStart,
+        const SizedBox(height: 12),
+        _ReferenceSection(
+          children: [
+            _ReferenceToggleRow(
+              icon: Icons.article_outlined,
+              title: 'End-of-day review',
+              subtitle: 'Get a reminder to review your day.',
+              value: settings.endOfDayReview,
+              onChanged: settings.notificationsEnabled
+                  ? settings.setEndOfDayReview
+                  : null,
+            ),
+            if (settings.endOfDayReview)
+              _ReferenceActionRow(
+                icon: Icons.schedule_outlined,
+                title: 'Review time',
+                value: settings.endOfDayTime.format(context),
+                enabled: settings.notificationsEnabled,
+                onTap: () => _selectTime(
+                  context,
+                  settings.endOfDayTime,
+                  settings.setEndOfDayTime,
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _TimeSettingTile(
-                  title: 'Until',
-                  value: settings.quietEnd,
-                  enabled: settings.notificationsEnabled,
-                  onChanged: settings.setQuietEnd,
+          ],
+        ),
+        const SizedBox(height: 12),
+        _ReferenceSection(
+          tint: context.appSoftAmber.withValues(alpha: .5),
+          children: [
+            _ReferenceToggleRow(
+              icon: Icons.dark_mode_outlined,
+              iconColor: const Color(0xFFD29500),
+              title: 'Quiet hours',
+              subtitle: 'Pause non-essential notifications at night.',
+              value: settings.quietHoursEnabled,
+              onChanged: settings.notificationsEnabled
+                  ? settings.setQuietHoursEnabled
+                  : null,
+            ),
+            if (settings.quietHoursEnabled) ...[
+              _ReferenceActionRow(
+                icon: Icons.dark_mode_outlined,
+                title: 'From',
+                value: settings.quietStart.format(context),
+                enabled: settings.notificationsEnabled,
+                onTap: () => _selectTime(
+                  context,
+                  settings.quietStart,
+                  settings.setQuietStart,
+                ),
+              ),
+              _ReferenceActionRow(
+                icon: Icons.dark_mode_outlined,
+                title: 'Until',
+                value: settings.quietEnd.format(context),
+                enabled: settings.notificationsEnabled,
+                onTap: () => _selectTime(
+                  context,
+                  settings.quietEnd,
+                  settings.setQuietEnd,
                 ),
               ),
             ],
-          ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.info_outline_rounded),
-          title: const Text('First reminder explanation'),
-          subtitle: const Text(
-            'Explains that reminders can be disabled for one goal or for everything.',
-          ),
-          trailing: OutlinedButton(
-            onPressed: () => settings.setFirstReminderEducationSeen(false),
-            child: const Text('Show again'),
-          ),
+          ],
         ),
       ],
     ),
   );
+}
+
+Future<void> _selectTime(
+  BuildContext context,
+  TimeOfDay initial,
+  ValueChanged<TimeOfDay> onSelected,
+) async {
+  final selected = await showTimePicker(context: context, initialTime: initial);
+  if (selected != null) onSelected(selected);
 }
 
 class _NotificationStatusTile extends StatelessWidget {
@@ -1248,16 +1964,53 @@ class _NotificationStatusTile extends StatelessWidget {
             ? 'Reading device permission and scheduled reminders.'
             : '${current.pendingCount} scheduled · '
                   '${current.exactTimingAvailable ? 'exact timing available' : 'battery-friendly timing'}');
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: loading
-          ? const SizedBox.square(
-              dimension: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Icon(icon),
-      title: Text(title),
-      subtitle: Text(subtitle),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: current?.allowed == false
+            ? context.appSoftRed
+            : context.appSoftGreen,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: current?.allowed == false
+              ? AppColors.coral.withValues(alpha: .25)
+              : AppColors.lightGreen.withValues(alpha: .25),
+        ),
+      ),
+      child: Row(
+        children: [
+          loading
+              ? const SizedBox.square(
+                  dimension: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(icon, color: context.appGreenText),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  current?.allowed == true ? 'Notifications available' : title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: current?.allowed == false
+                        ? context.appDangerText
+                        : context.appGreenText,
+                  ),
+                ),
+                Text(
+                  current?.allowed == true
+                      ? "You'll receive reminders on this device."
+                      : subtitle,
+                  style: TextStyle(fontSize: 10.5, color: context.appMuted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1269,16 +2022,28 @@ class _PlanSettings extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: settings,
-    builder: (context, _) => _SettingsCard(
+    builder: (context, _) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Start goals automatically'),
-          subtitle: const Text(
-            'Move a planned goal to Active when its start date arrives.',
-          ),
-          value: settings.automaticStarts,
-          onChanged: settings.setAutomaticStarts,
+        _ReferenceSection(
+          tint: context.appSoftGreen,
+          children: [
+            _ReferenceToggleRow(
+              icon: Icons.calendar_month_outlined,
+              iconColor: AppColors.lightGreen,
+              title: 'Start goals automatically',
+              subtitle:
+                  'Move a planned goal to Active when its start date arrives.',
+              value: settings.automaticStarts,
+              onChanged: settings.setAutomaticStarts,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _InfoPanel(
+          icon: Icons.info_outline_rounded,
+          color: AppColors.blueText,
+          text: 'Existing start dates are respected.',
         ),
       ],
     ),
@@ -1294,106 +2059,173 @@ class _WidgetSettings extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: settings,
-    builder: (context, _) => _SettingsCard(
+    builder: (context, _) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Show today’s actions'),
-          subtitle: const Text(
-            'Includes a Done button when the widget has room.',
-          ),
-          value: settings.widgetShowTodayActions,
-          onChanged: settings.setWidgetShowTodayActions,
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Show progress'),
-          subtitle: const Text(
-            'Follows Percentage, Amount completed, or Both.',
-          ),
-          value: settings.widgetShowProgress,
-          onChanged: settings.setWidgetShowProgress,
-        ),
-        DropdownButtonFormField<WidgetGoalScope>(
-          initialValue: settings.widgetGoalScope,
-          decoration: const InputDecoration(labelText: 'Cards shown'),
-          items: [
-            for (final item in WidgetGoalScope.values)
-              DropdownMenuItem(value: item, child: Text(item.label)),
-          ],
-          onChanged: (value) {
-            if (value != null) settings.setWidgetGoalScope(value);
-          },
-        ),
-        const SizedBox(height: 10),
-        DropdownButtonFormField<String>(
-          initialValue: settings.widgetCategory,
-          decoration: const InputDecoration(labelText: 'Category'),
-          items: [
-            const DropdownMenuItem(
-              value: '',
-              child: Text('All visible categories'),
-            ),
-            for (final category in settings.visibleCategories(
-              store.availableCategories,
-            ))
-              DropdownMenuItem(value: category, child: Text(category)),
-          ],
-          onChanged: (value) {
-            if (value != null) settings.setWidgetCategory(value);
-          },
-        ),
-        const SizedBox(height: 10),
-        DropdownButtonFormField<int>(
-          initialValue: settings.widgetMaxCards,
-          decoration: const InputDecoration(labelText: 'Maximum cards'),
-          items: const [
-            DropdownMenuItem(value: 3, child: Text('3')),
-            DropdownMenuItem(value: 5, child: Text('5')),
-            DropdownMenuItem(value: 8, child: Text('8')),
-          ],
-          onChanged: (value) {
-            if (value != null) settings.setWidgetMaxCards(value);
-          },
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          'The Android home-screen widgets refresh automatically after goal '
-          'or Settings changes.',
-        ),
-        const SizedBox(height: 14),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        _ReferenceSection(
           children: [
-            OutlinedButton.icon(
-              onPressed: () => GoalWidgetService().requestPinTodayWidget(),
-              icon: const Icon(Icons.task_alt_rounded),
-              label: const Text('Add Today widget'),
+            _ReferenceToggleRow(
+              icon: Icons.grid_view_outlined,
+              title: "Show today's actions",
+              subtitle: 'Display your next tasks on Home screen.',
+              value: settings.widgetShowTodayActions,
+              onChanged: settings.setWidgetShowTodayActions,
             ),
-            OutlinedButton.icon(
-              onPressed: () => GoalWidgetService().requestPinCardsWidget(),
-              icon: const Icon(Icons.view_kanban_outlined),
-              label: const Text('Add Goal Cards widget'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => GoalWidgetService().requestPinCalendarWidget(),
-              icon: const Icon(Icons.calendar_view_day_outlined),
-              label: const Text('Add Calendar widget'),
-            ),
-            FilledButton.icon(
-              onPressed: () => GoalWidgetService().sync(
-                store.goals,
-                store,
-                lifeStore,
-                settings,
-              ),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Refresh widgets'),
+            _ReferenceToggleRow(
+              icon: Icons.bar_chart_rounded,
+              title: 'Show progress',
+              subtitle: 'Show goal progress on Home screen.',
+              value: settings.widgetShowProgress,
+              onChanged: settings.setWidgetShowProgress,
             ),
           ],
+        ),
+        const SizedBox(height: 12),
+        _ReferenceSection(
+          title: 'Widget content',
+          children: [
+            _ReferenceActionRow(
+              icon: Icons.track_changes_rounded,
+              title: 'Goal scope',
+              value: settings.widgetGoalScope.label,
+              onTap: () => _chooseSetting<WidgetGoalScope>(
+                context,
+                title: 'Goal scope',
+                values: WidgetGoalScope.values,
+                selected: settings.widgetGoalScope,
+                label: (value) => value.label,
+                onSelected: settings.setWidgetGoalScope,
+              ),
+            ),
+            _ReferenceActionRow(
+              icon: Icons.format_list_bulleted_rounded,
+              title: 'Categories',
+              value: settings.widgetCategory.isEmpty
+                  ? 'All visible categories'
+                  : settings.widgetCategory,
+              onTap: () {
+                final values = <String>[
+                  '',
+                  ...settings.visibleCategories(store.availableCategories),
+                ];
+                _chooseSetting<String>(
+                  context,
+                  title: 'Categories',
+                  values: values,
+                  selected: settings.widgetCategory,
+                  label: (value) =>
+                      value.isEmpty ? 'All visible categories' : value,
+                  onSelected: settings.setWidgetCategory,
+                );
+              },
+            ),
+            _ReferenceActionRow(
+              icon: Icons.tag_rounded,
+              title: 'Maximum goals',
+              value: '${settings.widgetMaxCards}',
+              onTap: () => _chooseSetting<int>(
+                context,
+                title: 'Maximum goals',
+                values: const [3, 5, 8],
+                selected: settings.widgetMaxCards,
+                label: (value) => '$value',
+                onSelected: settings.setWidgetMaxCards,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _ReferenceSection(
+          title: 'Add widgets',
+          children: [
+            _WidgetAction(
+              title: 'Add Today widget',
+              subtitle: 'Your next actions',
+              onTap: () => GoalWidgetService().requestPinTodayWidget(),
+            ),
+            _WidgetAction(
+              title: 'Add Goal Cards widget',
+              subtitle: 'Progress at a glance',
+              onTap: () => GoalWidgetService().requestPinCardsWidget(),
+            ),
+            _WidgetAction(
+              title: 'Add Calendar widget',
+              subtitle: 'Upcoming events and Salah',
+              onTap: () => GoalWidgetService().requestPinCalendarWidget(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            backgroundColor: context.appSoftRed,
+            foregroundColor: AppColors.coralText,
+          ),
+          onPressed: () =>
+              GoalWidgetService().sync(store.goals, store, lifeStore, settings),
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Refresh widgets'),
         ),
       ],
+    ),
+  );
+}
+
+class _WidgetAction extends StatelessWidget {
+  const _WidgetAction({
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.blue.withValues(alpha: .7)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: context.appSoftBlue,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.add_rounded, color: AppColors.blueText),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.blueText,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 10.5, color: context.appMuted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     ),
   );
 }
@@ -1403,21 +2235,38 @@ class _LocalDataSettings extends StatelessWidget {
   final GoalStore store;
 
   @override
-  Widget build(BuildContext context) => _SettingsCard(
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.save_outlined),
-        title: Text('Automatic saving is on'),
-        subtitle: Text(
-          'Goals, checklist steps, progress, reminders, and Settings save as soon as they change.',
-        ),
+      _ReferenceSection(
+        tint: context.appSoftGreen,
+        children: const [
+          _ReferenceActionRow(
+            icon: Icons.check_circle_rounded,
+            iconColor: AppColors.lightGreen,
+            title: 'Automatic saving is on',
+            subtitle:
+                'Goals, checklist steps, progress, reminders, and Settings save as soon as they change.',
+            trailing: SizedBox.shrink(),
+          ),
+        ],
       ),
-      const Divider(),
-      SelectableText(store.storagePath),
+      const SizedBox(height: 12),
+      _ReferenceSection(
+        title: 'Storage location',
+        children: [
+          _ReferenceActionRow(
+            icon: Icons.folder_outlined,
+            title: 'On this device',
+            value: 'Life Tracker / Data',
+            trailing: const SizedBox.shrink(),
+          ),
+        ],
+      ),
       const SizedBox(height: 12),
       OutlinedButton.icon(
         key: const Key('open-local-folder-setting'),
+        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         onPressed: () async {
           final opened = await store.openStorageFolder();
           if (!opened && context.mounted) {
@@ -1439,37 +2288,13 @@ class _LocalDataSettings extends StatelessWidget {
         icon: const Icon(Icons.folder_open_outlined),
         label: const Text('Open local Markdown folder'),
       ),
+      const SizedBox(height: 12),
+      const _InfoPanel(
+        icon: Icons.info_outline_rounded,
+        color: AppColors.blueText,
+        text:
+            "Your data stays on this device. Files are saved in Markdown format so they're easy to back up and keep private.",
+      ),
     ],
-  );
-}
-
-class _TimeSettingTile extends StatelessWidget {
-  const _TimeSettingTile({
-    required this.title,
-    required this.value,
-    required this.enabled,
-    required this.onChanged,
-  });
-  final String title;
-  final TimeOfDay value;
-  final bool enabled;
-  final ValueChanged<TimeOfDay> onChanged;
-
-  @override
-  Widget build(BuildContext context) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    title: Text(title),
-    subtitle: Text(value.format(context)),
-    trailing: const Icon(Icons.schedule_rounded),
-    enabled: enabled,
-    onTap: !enabled
-        ? null
-        : () async {
-            final chosen = await showTimePicker(
-              context: context,
-              initialTime: value,
-            );
-            if (chosen != null) onChanged(chosen);
-          },
   );
 }

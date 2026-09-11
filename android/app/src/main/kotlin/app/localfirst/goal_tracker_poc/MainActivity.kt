@@ -69,6 +69,7 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "currentLocation" -> requestCurrentLocation(result)
+                "systemThemeColors" -> result.success(systemThemeColors())
                 "openUrl" -> {
                     val url = call.argument<String>("url")
                     if (url.isNullOrBlank()) {
@@ -84,6 +85,19 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun systemThemeColors(): Map<String, Long>? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
+        fun systemColor(name: String): Long? {
+            val id = resources.getIdentifier(name, "color", "android")
+            if (id == 0) return null
+            @Suppress("DEPRECATION")
+            return (resources.getColor(id).toLong() and 0xFFFFFFFFL)
+        }
+        val light = systemColor("system_accent1_600") ?: return null
+        val dark = systemColor("system_accent1_200") ?: light
+        return mapOf("light" to light, "dark" to dark)
     }
 
     private fun requestCurrentLocation(result: MethodChannel.Result) {

@@ -268,17 +268,31 @@ class _LifeCalendarPageState extends State<LifeCalendarPage> {
     TimeOfDay? initialEndTime,
   }) {
     if (entry?.id.startsWith('salah-') ?? false) return Future.value();
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => _CalendarEditorSheet(
-        store: widget.lifeStore,
-        initialDate: date,
-        entry: entry,
-        initialTime: initialTime,
-        initialEndTime: initialEndTime,
+    if (context.isDarkMode) {
+      return showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (_) => _CalendarEditorSheet(
+          store: widget.lifeStore,
+          initialDate: date,
+          entry: entry,
+          initialTime: initialTime,
+          initialEndTime: initialEndTime,
+        ),
+      );
+    }
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _CalendarEditorSheet(
+          store: widget.lifeStore,
+          initialDate: date,
+          entry: entry,
+          initialTime: initialTime,
+          initialEndTime: initialEndTime,
+        ),
       ),
     );
   }
@@ -2024,6 +2038,7 @@ class _CalendarEditorSheet extends StatefulWidget {
 class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
   late final TextEditingController _title;
   late final TextEditingController _location;
+  late final TextEditingController _notes;
   late DateTime _date;
   late CalendarEntryKind _kind;
   late CalendarRepeat _repeat;
@@ -2044,6 +2059,7 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
     final entry = widget.entry;
     _title = TextEditingController(text: entry?.title ?? '');
     _location = TextEditingController(text: entry?.location ?? '');
+    _notes = TextEditingController(text: entry?.notes ?? '');
     _date = entry == null
         ? _dateOnly(widget.initialDate)
         : _dateOnly(entry.start);
@@ -2056,8 +2072,8 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
     _colorValue =
         entry?.colorValue ??
         (entry?.kind == CalendarEntryKind.blockedTime
-            ? 0xFFD16A61
-            : 0xFF6F72E8);
+            ? 0xFF59C98A
+            : 0xFFFFD86B);
     _startTime = entry == null
         ? widget.initialTime ?? const TimeOfDay(hour: 9, minute: 0)
         : TimeOfDay.fromDateTime(entry.start);
@@ -2078,203 +2094,434 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
   void dispose() {
     _title.dispose();
     _location.dispose();
+    _notes.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => FractionallySizedBox(
-    heightFactor: .9,
-    child: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            2,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom + 18,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _editing ? 'Edit calendar item' : 'Add to calendar',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    if (_editing)
-                      IconButton(
-                        tooltip: 'Delete',
-                        onPressed: _delete,
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          color: Color(0xFFD96A72),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: context.appRaised,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: context.appBorder),
-                  ),
-                  child: Row(
+  Widget build(BuildContext context) {
+    if (!context.isDarkMode) return _buildLightEditor(context);
+    return FractionallySizedBox(
+      heightFactor: .9,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 620),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              2,
+              20,
+              MediaQuery.viewInsetsOf(context).bottom + 18,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
                     children: [
                       Expanded(
-                        child: _KindButton(
-                          label: 'Event',
-                          icon: Icons.event_outlined,
-                          selected: _kind == CalendarEntryKind.event,
-                          onTap: () =>
-                              setState(() => _kind = CalendarEntryKind.event),
+                        child: Text(
+                          _editing ? 'Edit calendar item' : 'Add to calendar',
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ),
-                      Expanded(
-                        child: _KindButton(
-                          label: 'Blocked time',
-                          icon: Icons.block_outlined,
-                          selected: _kind == CalendarEntryKind.blockedTime,
-                          onTap: () => setState(
-                            () => _kind = CalendarEntryKind.blockedTime,
+                      if (_editing)
+                        IconButton(
+                          tooltip: 'Delete',
+                          onPressed: _delete,
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Color(0xFFD96A72),
                           ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: context.appRaised,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: context.appBorder),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _KindButton(
+                            label: 'Event',
+                            icon: Icons.event_outlined,
+                            selected: _kind == CalendarEntryKind.event,
+                            onTap: () =>
+                                setState(() => _kind = CalendarEntryKind.event),
+                          ),
+                        ),
+                        Expanded(
+                          child: _KindButton(
+                            label: 'Blocked time',
+                            icon: Icons.block_outlined,
+                            selected: _kind == CalendarEntryKind.blockedTime,
+                            onTap: () => setState(
+                              () => _kind = CalendarEntryKind.blockedTime,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    key: const Key('calendar-title-field'),
+                    controller: _title,
+                    autofocus: !_editing,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      labelText: _kind == CalendarEntryKind.blockedTime
+                          ? 'What is this time protected for?'
+                          : 'Event name',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final chosen = await showActivityIconPicker(
+                        context,
+                        selectedId:
+                            _iconId == 'calendar' &&
+                                _title.text.trim().isNotEmpty
+                            ? ActivityIconCatalog.guess(_title.text).id
+                            : _iconId,
+                      );
+                      if (chosen != null && mounted) {
+                        setState(() => _iconId = chosen);
+                      }
+                    },
+                    icon: ActivityIcon(id: _iconId),
+                    label: const Text('Choose activity icon'),
+                  ),
+                  const SizedBox(height: 12),
+                  _CalendarColorField(
+                    color: Color(_colorValue),
+                    onTap: _pickColor,
+                  ),
+                  const SizedBox(height: 12),
+                  _EditorRow(
+                    icon: Icons.calendar_today_outlined,
+                    label: 'Date',
+                    value: _fullDate(_date),
+                    onTap: _pickDate,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _EditorRow(
+                          icon: Icons.schedule_outlined,
+                          label: 'Starts',
+                          value: _startTime.format(context),
+                          onTap: () => _pickTime(start: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _EditorRow(
+                          icon: Icons.schedule_outlined,
+                          label: 'Ends',
+                          value: _endTime.format(context),
+                          onTap: () => _pickTime(start: false),
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  key: const Key('calendar-title-field'),
-                  controller: _title,
-                  autofocus: !_editing,
-                  textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
-                    labelText: _kind == CalendarEntryKind.blockedTime
-                        ? 'What is this time protected for?'
-                        : 'Event name',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final chosen = await showActivityIconPicker(
-                      context,
-                      selectedId:
-                          _iconId == 'calendar' && _title.text.trim().isNotEmpty
-                          ? ActivityIconCatalog.guess(_title.text).id
-                          : _iconId,
-                    );
-                    if (chosen != null && mounted) {
-                      setState(() => _iconId = chosen);
-                    }
-                  },
-                  icon: ActivityIcon(id: _iconId),
-                  label: const Text('Choose activity icon'),
-                ),
-                const SizedBox(height: 12),
-                _CalendarColorField(
-                  color: Color(_colorValue),
-                  onTap: _pickColor,
-                ),
-                const SizedBox(height: 12),
-                _EditorRow(
-                  icon: Icons.calendar_today_outlined,
-                  label: 'Date',
-                  value: _fullDate(_date),
-                  onTap: _pickDate,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _EditorRow(
-                        icon: Icons.schedule_outlined,
-                        label: 'Starts',
-                        value: _startTime.format(context),
-                        onTap: () => _pickTime(start: true),
-                      ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<CalendarRepeat>(
+                    initialValue: _repeat,
+                    decoration: const InputDecoration(
+                      labelText: 'Repeat',
+                      prefixIcon: Icon(Icons.repeat_rounded),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _EditorRow(
-                        icon: Icons.schedule_outlined,
-                        label: 'Ends',
-                        value: _endTime.format(context),
-                        onTap: () => _pickTime(start: false),
+                    items: [
+                      for (final repeat in CalendarRepeat.values)
+                        DropdownMenuItem(
+                          value: repeat,
+                          child: Text(repeat.label),
+                        ),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => _repeat = value ?? CalendarRepeat.none),
+                  ),
+                  if (_repeat != CalendarRepeat.none) ...[
+                    const SizedBox(height: 10),
+                    _RepeatOptions(
+                      repeat: _repeat,
+                      interval: _repeatInterval,
+                      weekdays: _repeatWeekdays,
+                      until: _repeatUntil,
+                      onIntervalChanged: (value) =>
+                          setState(() => _repeatInterval = value.clamp(1, 99)),
+                      onWeekdaysChanged: (value) =>
+                          setState(() => _repeatWeekdays = value),
+                      onPickUntil: _pickRepeatUntil,
+                      onClearUntil: () => setState(() => _repeatUntil = null),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _location,
+                    decoration: const InputDecoration(
+                      labelText: 'Location (optional)',
+                      prefixIcon: Icon(Icons.location_on_outlined),
+                    ),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      _error!,
+                      style: TextStyle(
+                        color: context.appDangerText,
+                        fontSize: 12,
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<CalendarRepeat>(
-                  initialValue: _repeat,
-                  decoration: const InputDecoration(
-                    labelText: 'Repeat',
-                    prefixIcon: Icon(Icons.repeat_rounded),
-                  ),
-                  items: [
-                    for (final repeat in CalendarRepeat.values)
-                      DropdownMenuItem(
-                        value: repeat,
-                        child: Text(repeat.label),
-                      ),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _repeat = value ?? CalendarRepeat.none),
-                ),
-                if (_repeat != CalendarRepeat.none) ...[
-                  const SizedBox(height: 10),
-                  _RepeatOptions(
-                    repeat: _repeat,
-                    interval: _repeatInterval,
-                    weekdays: _repeatWeekdays,
-                    until: _repeatUntil,
-                    onIntervalChanged: (value) =>
-                        setState(() => _repeatInterval = value.clamp(1, 99)),
-                    onWeekdaysChanged: (value) =>
-                        setState(() => _repeatWeekdays = value),
-                    onPickUntil: _pickRepeatUntil,
-                    onClearUntil: () => setState(() => _repeatUntil = null),
+                  const SizedBox(height: 18),
+                  FilledButton(
+                    key: const Key('calendar-save-button'),
+                    onPressed: _save,
+                    child: Text(_editing ? 'Save changes' : 'Add to calendar'),
                   ),
                 ],
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _location,
-                  decoration: const InputDecoration(
-                    labelText: 'Location (optional)',
-                    prefixIcon: Icon(Icons.location_on_outlined),
-                  ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _error!,
-                    style: TextStyle(
-                      color: context.appDangerText,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 18),
-                FilledButton(
-                  key: const Key('calendar-save-button'),
-                  onPressed: _save,
-                  child: Text(_editing ? 'Save changes' : 'Add to calendar'),
-                ),
-              ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLightEditor(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      leading: IconButton(
+        tooltip: 'Back',
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.arrow_back_rounded),
+      ),
+      title: Text(_editing ? 'Edit calendar item' : 'New calendar item'),
+      actions: [
+        if (_editing)
+          IconButton(
+            tooltip: 'Delete',
+            onPressed: _delete,
+            icon: const Icon(Icons.delete_outline_rounded),
+          ),
+      ],
+    ),
+    body: SafeArea(
+      top: false,
+      child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.fromLTRB(
+          14,
+          8,
+          14,
+          18 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: context.appPanel,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: context.appBorder),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _KindButton(
+                    label: 'Event',
+                    icon: Icons.event_outlined,
+                    selected: _kind == CalendarEntryKind.event,
+                    onTap: () =>
+                        setState(() => _kind = CalendarEntryKind.event),
+                  ),
+                ),
+                Expanded(
+                  child: _KindButton(
+                    label: 'Protected time',
+                    icon: Icons.shield_outlined,
+                    selected: _kind == CalendarEntryKind.blockedTime,
+                    onTap: () =>
+                        setState(() => _kind = CalendarEntryKind.blockedTime),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          const _CalendarFormLabel('Title'),
+          TextField(
+            key: const Key('calendar-title-field'),
+            controller: _title,
+            autofocus: !_editing,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(hintText: 'Business focus'),
+          ),
+          const SizedBox(height: 10),
+          _CalendarFormField(
+            icon: Icons.calendar_today_outlined,
+            label: 'Date',
+            value: _fullDate(_date),
+            onTap: _pickDate,
+          ),
+          const SizedBox(height: 8),
+          _CalendarFormField(
+            icon: Icons.schedule_outlined,
+            label: 'Start time',
+            value: _startTime.format(context),
+            onTap: () => _pickTime(start: true),
+          ),
+          const SizedBox(height: 8),
+          _CalendarFormField(
+            icon: Icons.schedule_outlined,
+            label: 'End time',
+            value: _endTime.format(context),
+            onTap: () => _pickTime(start: false),
+          ),
+          const SizedBox(height: 8),
+          _CalendarFormField(
+            icon: Icons.repeat_rounded,
+            label: 'Repeat',
+            value: _repeat.label,
+            onTap: _pickRepeat,
+          ),
+          if (_repeat != CalendarRepeat.none) ...[
+            const SizedBox(height: 8),
+            _RepeatOptions(
+              repeat: _repeat,
+              interval: _repeatInterval,
+              weekdays: _repeatWeekdays,
+              until: _repeatUntil,
+              onIntervalChanged: (value) =>
+                  setState(() => _repeatInterval = value.clamp(1, 99)),
+              onWeekdaysChanged: (value) =>
+                  setState(() => _repeatWeekdays = value),
+              onPickUntil: _pickRepeatUntil,
+              onClearUntil: () => setState(() => _repeatUntil = null),
+            ),
+          ],
+          const SizedBox(height: 8),
+          _CalendarFormField(
+            icon: Icons.circle,
+            iconColor: Color(_colorValue),
+            label: 'Color',
+            value: _calendarColorName(_colorValue),
+            onTap: _pickColor,
+          ),
+          const SizedBox(height: 8),
+          _CalendarFormField(
+            icon: Icons.location_on_outlined,
+            label: 'Location',
+            value: _location.text.trim().isEmpty
+                ? 'Add location'
+                : _location.text.trim(),
+            onTap: _editLocation,
+          ),
+          const SizedBox(height: 10),
+          const _CalendarFormLabel('Notes'),
+          TextField(
+            controller: _notes,
+            minLines: 3,
+            maxLines: 6,
+            decoration: const InputDecoration(
+              hintText: 'Add details, preparation, or context',
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 9),
+            Text(
+              _error!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 52,
+            child: FilledButton(
+              key: const Key('calendar-save-button'),
+              onPressed: _save,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.coral,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(_editing ? 'Save changes' : 'Save'),
+            ),
+          ),
+        ],
+      ),
     ),
   );
+
+  Future<void> _pickRepeat() async {
+    final selected = await showModalBottomSheet<CalendarRepeat>(
+      context: context,
+      useSafeArea: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          12 + MediaQuery.viewPaddingOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Repeat', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            for (final repeat in CalendarRepeat.values)
+              ListTile(
+                title: Text(repeat.label),
+                trailing: repeat == _repeat
+                    ? const Icon(Icons.check_rounded, color: AppColors.coral)
+                    : null,
+                onTap: () => Navigator.pop(context, repeat),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null && mounted) setState(() => _repeat = selected);
+  }
+
+  Future<void> _editLocation() async {
+    final controller = TextEditingController(text: _location.text);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Location'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(hintText: 'Office'),
+          onSubmitted: (value) => Navigator.pop(context, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value != null && mounted) setState(() => _location.text = value);
+  }
 
   Future<void> _pickDate() async {
     final chosen = await showDatePicker(
@@ -2340,6 +2587,7 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
         end: end,
         kind: _kind,
         location: _location.text,
+        notes: _notes.text,
         repeat: _repeat,
         repeatInterval: _repeatInterval,
         repeatWeekdays: _repeatWeekdays,
@@ -2357,6 +2605,7 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
           end: end,
           kind: _kind,
           location: _location.text.trim(),
+          notes: _notes.text.trim(),
           repeat: _repeat,
           repeatInterval: _repeatInterval,
           repeatWeekdays: _repeatWeekdays,
@@ -2407,6 +2656,84 @@ class _CalendarEditorSheetState extends State<_CalendarEditorSheet> {
     if (mounted) Navigator.pop(context);
   }
 }
+
+class _CalendarFormLabel extends StatelessWidget {
+  const _CalendarFormLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(left: 1, bottom: 5),
+    child: Text(
+      text,
+      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+    ),
+  );
+}
+
+class _CalendarFormField extends StatelessWidget {
+  const _CalendarFormField({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+    this.iconColor = AppColors.blueText,
+  });
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: context.appPanel,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+      side: BorderSide(color: context.appBorder),
+    ),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: iconColor),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 76,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, size: 19),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+String _calendarColorName(int value) => switch (value) {
+  0xFFFFD86B => 'Light yellow',
+  0xFF54A9FF => 'Light blue',
+  0xFF59C98A => 'Light green',
+  0xFFFF6B68 => 'Light red',
+  _ => 'Custom color',
+};
 
 class _RepeatOptions extends StatelessWidget {
   const _RepeatOptions({
@@ -2893,12 +3220,14 @@ class _ScheduleImportSheet extends StatefulWidget {
 
 class _ScheduleImportSheetState extends State<_ScheduleImportSheet> {
   final _controller = TextEditingController();
+  final _scheduleFocus = FocusNode();
   bool _saving = false;
   String? _selectedFileName;
 
   @override
   void dispose() {
     _controller.dispose();
+    _scheduleFocus.dispose();
     super.dispose();
   }
 
@@ -2938,11 +3267,22 @@ class _ScheduleImportSheetState extends State<_ScheduleImportSheet> {
                         : 'Selected: $_selectedFileName',
                   ),
                 ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _saving ? null : _pasteRows,
+                  icon: const Icon(Icons.content_paste_rounded),
+                  label: const Text('Paste schedule rows'),
+                ),
                 const SizedBox(height: 12),
+                const Text(
+                  'Schedule data (CSV, TSV, or pasted rows)',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 5),
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    autofocus: true,
+                    focusNode: _scheduleFocus,
                     expands: true,
                     minLines: null,
                     maxLines: null,
@@ -2953,10 +3293,60 @@ class _ScheduleImportSheetState extends State<_ScheduleImportSheet> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
-                FilledButton(
-                  onPressed: _saving ? null : _import,
-                  child: Text(_saving ? 'Importing…' : 'Import schedule'),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: context.appSoftBlue,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: context.appBorder),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        color: AppColors.blueText,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          'Use a CSV or TSV file with date, start time, end time, and title. You can also paste rows directly from your calendar export.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: context.appBlueText,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        onPressed: _saving ? null : _import,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.coral,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text(_saving ? 'Importing…' : 'Import schedule'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -2996,6 +3386,16 @@ class _ScheduleImportSheetState extends State<_ScheduleImportSheet> {
     } on Object {
       _showFileError('That schedule file could not be opened.');
     }
+  }
+
+  Future<void> _pasteRows() async {
+    final clipboard = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = clipboard?.text?.trim();
+    if (!mounted) return;
+    if (text != null && text.isNotEmpty) {
+      setState(() => _controller.text = text);
+    }
+    _scheduleFocus.requestFocus();
   }
 
   void _showFileError(String message) {

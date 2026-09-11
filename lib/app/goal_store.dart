@@ -613,31 +613,44 @@ class GoalStore extends ChangeNotifier {
     await _replace(goal.copyWith(updates: updates, updatedAt: now));
   }
 
-  Future<void> completeTodayAction(String goalId, {String note = ''}) async {
+  Future<void> completeTodayAction(
+    String goalId, {
+    String note = '',
+    double? amount,
+    TaskCompletionNote? record,
+  }) async {
     final goal = _find(goalId);
     final plan = goal?.plan;
     if (goal == null || plan == null || goal.completionFor(today) != null) {
       return;
     }
-    final amount = calculator.actionForDate(goal, today);
-    if (amount <= 0) return;
-    final next = math.min(plan.totalAmount, goal.completedAmount + amount);
+    final plannedAmount = calculator.actionForDate(goal, today);
+    final recordedAmount = (amount ?? plannedAmount)
+        .clamp(0.0, math.max(0, plan.totalAmount - goal.completedAmount))
+        .toDouble();
+    if (plannedAmount <= 0 && record == null) return;
+    final next = math.min(
+      plan.totalAmount,
+      goal.completedAmount + recordedAmount,
+    );
     final actualChange = next - goal.completedAmount;
-    if (actualChange <= 0) return;
+    if (actualChange <= 0 && record == null) return;
     _rememberUndo(goal, 'Mark today\'s action not complete');
     final now = _clock();
     await _replace(
       goal.copyWith(
         completedAmount: next,
-        progressHistory: [
-          ...goal.progressHistory,
-          ProgressEntry(
-            recordedAt: now,
-            change: actualChange,
-            completedAfter: next,
-            note: note.trim(),
-          ),
-        ],
+        progressHistory: actualChange <= 0
+            ? goal.progressHistory
+            : [
+                ...goal.progressHistory,
+                ProgressEntry(
+                  recordedAt: now,
+                  change: actualChange,
+                  completedAfter: next,
+                  note: note.trim(),
+                ),
+              ],
         dailyActionCompletions: [
           ...goal.dailyActionCompletions,
           DailyActionCompletion(
@@ -645,30 +658,32 @@ class GoalStore extends ChangeNotifier {
             completedAt: now,
             amount: actualChange,
             note: note.trim(),
-            record: TaskCompletionNote(
-              day: DateTime(today.year, today.month, today.day),
-              recordedAt: now,
-              text: note.trim(),
-              actualEndAt: now,
-              scheduledStartAt: goal.reminder == null
-                  ? null
-                  : DateTime(
-                      today.year,
-                      today.month,
-                      today.day,
-                      goal.reminder!.hour,
-                      goal.reminder!.minute,
-                    ),
-              scheduledEndAt: goal.reminder == null
-                  ? null
-                  : DateTime(
-                      today.year,
-                      today.month,
-                      today.day,
-                      goal.reminder!.hour,
-                      goal.reminder!.minute,
-                    ).add(const Duration(hours: 1)),
-            ),
+            record:
+                record ??
+                TaskCompletionNote(
+                  day: DateTime(today.year, today.month, today.day),
+                  recordedAt: now,
+                  text: note.trim(),
+                  actualEndAt: now,
+                  scheduledStartAt: goal.reminder == null
+                      ? null
+                      : DateTime(
+                          today.year,
+                          today.month,
+                          today.day,
+                          goal.reminder!.hour,
+                          goal.reminder!.minute,
+                        ),
+                  scheduledEndAt: goal.reminder == null
+                      ? null
+                      : DateTime(
+                          today.year,
+                          today.month,
+                          today.day,
+                          goal.reminder!.hour,
+                          goal.reminder!.minute,
+                        ).add(const Duration(hours: 1)),
+                ),
           ),
         ],
         showStartNotice: false,
@@ -690,7 +705,18 @@ class GoalStore extends ChangeNotifier {
           record.day.month == today.month &&
           record.day.day == today.day;
       if (!isToday) return;
-      await completeTodayAction(goalId, note: record.text);
+      final plannedAmount = calculator.actionForDate(goal, today);
+      final amount = switch (record.outcome) {
+        TaskCompletionOutcome.completed => plannedAmount,
+        TaskCompletionOutcome.partiallyCompleted => record.amountCompleted ?? 0,
+        TaskCompletionOutcome.skipped => 0,
+      }.toDouble();
+      await completeTodayAction(
+        goalId,
+        note: record.text,
+        amount: amount,
+        record: record,
+      );
       goal = _find(goalId);
       completion = goal?.completionFor(record.day);
     }

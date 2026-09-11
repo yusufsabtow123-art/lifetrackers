@@ -7,6 +7,7 @@ class AppSettingsData {
   const AppSettingsData({
     this.appearance = 'dark',
     this.accentColor = 'coral',
+    this.useSystemThemeColors = false,
     this.progressFormat = 'both',
     this.showAbandoned = false,
     this.compactGoalIds = const {},
@@ -65,6 +66,7 @@ class AppSettingsData {
 
   final String appearance;
   final String accentColor;
+  final bool useSystemThemeColors;
   final String progressFormat;
   final bool showAbandoned;
   final Set<String> compactGoalIds;
@@ -114,6 +116,7 @@ class AppSettingsData {
   AppSettingsData copyWith({
     String? appearance,
     String? accentColor,
+    bool? useSystemThemeColors,
     String? progressFormat,
     bool? showAbandoned,
     Set<String>? compactGoalIds,
@@ -162,6 +165,7 @@ class AppSettingsData {
   }) => AppSettingsData(
     appearance: appearance ?? this.appearance,
     accentColor: accentColor ?? this.accentColor,
+    useSystemThemeColors: useSystemThemeColors ?? this.useSystemThemeColors,
     progressFormat: progressFormat ?? this.progressFormat,
     showAbandoned: showAbandoned ?? this.showAbandoned,
     compactGoalIds: compactGoalIds ?? this.compactGoalIds,
@@ -218,6 +222,7 @@ class AppSettingsData {
   Map<String, Object?> toJson() => {
     'appearance': appearance,
     'accent_color': accentColor,
+    'use_system_theme_colors': useSystemThemeColors,
     'progress_format': progressFormat,
     'show_abandoned': showAbandoned,
     'compact_goal_ids': compactGoalIds.toList()..sort(),
@@ -277,6 +282,8 @@ class AppSettingsData {
     return AppSettingsData(
       appearance: value['appearance'] as String? ?? d.appearance,
       accentColor: value['accent_color'] as String? ?? d.accentColor,
+      useSystemThemeColors:
+          value['use_system_theme_colors'] as bool? ?? d.useSystemThemeColors,
       progressFormat: value['progress_format'] as String? ?? d.progressFormat,
       showAbandoned: value['show_abandoned'] as bool? ?? d.showAbandoned,
       compactGoalIds: setOf('compact_goal_ids', const {}),

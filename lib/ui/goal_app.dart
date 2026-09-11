@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/goal_store.dart';
 import '../app/life_store.dart';
@@ -35,12 +36,15 @@ class GoalApp extends StatefulWidget {
 }
 
 class _GoalAppState extends State<GoalApp> {
+  static const _platform = MethodChannel('life_tracker/files');
   late final AppSettingsController _settings;
   final _navigatorKey = GlobalKey<NavigatorState>();
   final _lifeShellKey = GlobalKey<LifeTrackerShellState>();
   StreamSubscription<NotificationIntent>? _notificationSubscription;
   StreamSubscription<Uri?>? _widgetSubscription;
   Timer? _syncTimer;
+  Color? _systemLightAccent;
+  Color? _systemDarkAccent;
 
   @override
   void initState() {
@@ -61,6 +65,26 @@ class _GoalAppState extends State<GoalApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_load());
     });
+    unawaited(_loadSystemThemeColors());
+  }
+
+  Future<void> _loadSystemThemeColors() async {
+    try {
+      final colors = await _platform.invokeMapMethod<String, int>(
+        'systemThemeColors',
+      );
+      if (!mounted || colors == null) return;
+      setState(() {
+        final light = colors['light'];
+        final dark = colors['dark'];
+        _systemLightAccent = light == null ? null : Color(light);
+        _systemDarkAccent = dark == null ? null : Color(dark);
+      });
+    } on PlatformException {
+      // Android versions before dynamic color support keep the approved palette.
+    } on MissingPluginException {
+      // Non-Android test and desktop hosts keep the approved palette.
+    }
   }
 
   void _applyLifeSettings() => widget.lifeStore?.applySettings(_settings.data);
@@ -506,30 +530,39 @@ class _GoalAppState extends State<GoalApp> {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _settings,
-      builder: (context, _) => MaterialApp(
-        navigatorKey: _navigatorKey,
-        debugShowCheckedModeBanner: false,
-        title: 'Life Tracker',
-        theme: buildAppTheme(accentColor: AppColors.coral),
-        darkTheme: buildAppTheme(
-          brightness: Brightness.dark,
-          accentColor: AppColors.coral,
-        ),
-        themeMode: _settings.themeMode,
-        home: widget.lifeStore == null
-            ? GoalBoardScreen(
-                store: widget.store,
-                settings: _settings,
-                notificationService: widget.notificationService,
-              )
-            : LifeTrackerShell(
-                key: _lifeShellKey,
-                goalStore: widget.store,
-                lifeStore: widget.lifeStore!,
-                settings: _settings,
-                notificationService: widget.notificationService,
-              ),
-      ),
+      builder: (context, _) {
+        final useSystem = _settings.useSystemThemeColors;
+        return MaterialApp(
+          navigatorKey: _navigatorKey,
+          debugShowCheckedModeBanner: false,
+          title: 'Life Tracker',
+          theme: buildAppTheme(
+            accentColor: useSystem
+                ? _systemLightAccent ?? AppColors.coral
+                : AppColors.coral,
+          ),
+          darkTheme: buildAppTheme(
+            brightness: Brightness.dark,
+            accentColor: useSystem
+                ? _systemDarkAccent ?? AppColors.coral
+                : AppColors.coral,
+          ),
+          themeMode: _settings.themeMode,
+          home: widget.lifeStore == null
+              ? GoalBoardScreen(
+                  store: widget.store,
+                  settings: _settings,
+                  notificationService: widget.notificationService,
+                )
+              : LifeTrackerShell(
+                  key: _lifeShellKey,
+                  goalStore: widget.store,
+                  lifeStore: widget.lifeStore!,
+                  settings: _settings,
+                  notificationService: widget.notificationService,
+                ),
+        );
+      },
     );
   }
 }

@@ -80,6 +80,9 @@ class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
           widget.store.today,
         );
         final width = MediaQuery.sizeOf(context).width;
+        if (!context.isDarkMode && width < 760) {
+          return _buildLightGoalDetails(goal, health);
+        }
         return Align(
           alignment: width >= 760
               ? Alignment.centerRight
@@ -234,6 +237,204 @@ class _GoalDetailsSheetState extends State<_GoalDetailsSheet> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildLightGoalDetails(Goal goal, GoalHealthSnapshot health) {
+    final plan = goal.plan;
+    final completion = goal.completionFor(widget.store.today);
+    final scheduled = plan == null
+        ? 0.0
+        : widget.store.calculator.actionForDate(goal, widget.store.today);
+    final actionAmount = completion?.amount ?? scheduled;
+    final actionDone = completion != null;
+    return Material(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: SafeArea(
+        child: Column(
+          children: [
+            SizedBox(
+              height: 62,
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Back',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
+                  Expanded(
+                    child: Text(
+                      goal.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  PopupMenuButton<_GoalMenuAction>(
+                    key: const Key('goal-details-menu'),
+                    tooltip: 'Goal options',
+                    onSelected: (action) => _handleMenuAction(action, goal),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: _GoalMenuAction.editDetails,
+                        child: Text('Edit details'),
+                      ),
+                      PopupMenuItem(
+                        value: _GoalMenuAction.reminder,
+                        child: Text(
+                          goal.reminder == null
+                              ? 'Add reminder'
+                              : 'Edit reminder',
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: _GoalMenuAction.plan,
+                        child: Text(plan == null ? 'Add plan' : 'Change plan'),
+                      ),
+                      if (plan != null)
+                        const PopupMenuItem(
+                          value: _GoalMenuAction.removePlan,
+                          child: Text('Remove plan'),
+                        ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: _GoalMenuAction.trash,
+                        child: Text('Move to Trash'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 18),
+                children: [
+                  if (plan != null && (scheduled > 0 || actionDone))
+                    Container(
+                      key: const Key('goal-today-action'),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: context.appSoftAmber,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColors.goldText.withValues(alpha: .24),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: const BoxDecoration(
+                              color: AppColors.softAmber,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.menu_book_outlined,
+                              color: AppColors.goldText,
+                            ),
+                          ),
+                          const SizedBox(width: 11),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Next action',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${actionDone ? 'Completed' : 'Complete'} ${formatAmount(actionAmount)} ${pluralize(plan.unit, actionAmount)}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          OutlinedButton(
+                            onPressed: () => actionDone
+                                ? widget.store.undoTodayAction(goal.id)
+                                : widget.store.completeTodayAction(goal.id),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.coralText,
+                              backgroundColor: context.appSoftRed,
+                              side: BorderSide(
+                                color: AppColors.coralText.withValues(
+                                  alpha: .24,
+                                ),
+                              ),
+                            ),
+                            child: Text(actionDone ? 'Undo' : 'Complete'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (plan != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: context.appPanel,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: context.appBorder),
+                      ),
+                      child: _ReferenceProgress(
+                        goal: goal,
+                        store: widget.store,
+                        health: health,
+                        progressFormat: widget.progressFormat,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(12, 5, 12, 10),
+                    decoration: BoxDecoration(
+                      color: context.appPanel,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: context.appBorder),
+                    ),
+                    child: GoalStepsSection(
+                      goal: goal,
+                      store: widget.store,
+                      compact: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: context.appPanel,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(color: context.appBorder),
+                    ),
+                    child: ListTile(
+                      key: const Key('edit-goal-details-button'),
+                      leading: const Icon(Icons.assignment_outlined),
+                      title: const Text(
+                        'Details',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: const Text('Target, notes, and more'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => _showGoalSettings(goal),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -420,6 +621,7 @@ class _ReferenceProgress extends StatelessWidget {
                   SizedBox.expand(
                     child: CircularProgressIndicator(
                       value: goal.progress.clamp(0, 1),
+                      color: context.isDarkMode ? null : AppColors.blue,
                       strokeWidth: 7,
                       strokeCap: StrokeCap.round,
                       backgroundColor: context.appBorder,

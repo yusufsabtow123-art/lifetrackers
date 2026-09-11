@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:goal_tracker_poc/app/life_store.dart';
+import 'package:goal_tracker_poc/app/goal_store.dart';
+import 'package:goal_tracker_poc/data/goal_repository.dart';
 import 'package:goal_tracker_poc/data/life_repository.dart';
 import 'package:goal_tracker_poc/domain/life_data.dart';
 import 'package:goal_tracker_poc/ui/app_theme.dart';
@@ -27,6 +29,7 @@ void main() {
       locationAddress: '605 Fairview Ave N, Saint Paul, MN',
       people: const [CompletionPerson(id: 'ahmed', name: 'Ahmed')],
       effort: TaskCompletionEffort.hard,
+      amountCompleted: 1.5,
     );
     final restored = TaskCompletionNote.fromJson(record.toJson());
 
@@ -35,6 +38,7 @@ void main() {
     expect(restored.locationName, 'Masjid Dawah');
     expect(restored.people.single.name, 'Ahmed');
     expect(restored.effort, TaskCompletionEffort.hard);
+    expect(restored.amountCompleted, 1.5);
   });
 
   test('saving a completion record persists every structured field', () async {
@@ -151,5 +155,115 @@ void main() {
     );
     expect(find.text('Save completion'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'partial completion without a numeric target requires and reveals notes',
+    (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final task = LifeTask(
+        id: 'call',
+        title: 'Call Ahmed',
+        createdAt: DateTime(2026, 9, 11),
+        dueAt: DateTime(2026, 9, 11, 10, 30),
+      );
+      final repository = MemoryLifeRepository(LifeData(tasks: [task]));
+      final store = LifeStore(repository);
+      await store.load();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAppTheme(),
+          home: TaskCompletionPage(
+            store: store,
+            task: task,
+            day: DateTime(2026, 9, 11),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('completion-outcome-partiallyCompleted')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Partially completed'), findsNWidgets(2));
+      final save = tester.widget<FilledButton>(
+        find.byKey(const Key('save-completion-record')),
+      );
+      save.onPressed!();
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Not completed'), findsOneWidget);
+      expect(find.textContaining('A note is required'), findsOneWidget);
+      expect(repository.data.tasks.single.isCompleted, isFalse);
+
+      await tester.enterText(
+        find.byKey(const Key('completion-record-notes')),
+        'Reached Ahmed but need to follow up tomorrow.',
+      );
+      await tester.tap(find.byKey(const Key('save-completion-record')));
+      await tester.pumpAndSettle();
+      expect(repository.data.tasks.single.isCompleted, isTrue);
+    },
+  );
+
+  testWidgets('numeric partial goal completion saves the entered amount', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final goals = GoalStore(
+      repository: MemoryGoalRepository(),
+      clock: () => DateTime(2026, 9, 11, 9),
+    );
+    await goals.load();
+    final goal = await goals.createPlanned(
+      name: 'Memorize the Quran',
+      amount: 604,
+      unit: 'pages',
+      startDate: DateTime(2026, 9, 11),
+      deadline: DateTime(2026, 12, 31),
+      wholeUnits: true,
+    );
+    final planned = goals.calculator.actionForDate(goal, goals.today);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: TaskCompletionPage.forGoal(
+          goalStore: goals,
+          goal: goal,
+          day: goals.today,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('completion-outcome-partiallyCompleted')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('completion-partial-amount')),
+      '${planned / 2}',
+    );
+    tester
+        .widget<FilledButton>(find.byKey(const Key('save-completion-record')))
+        .onPressed!();
+    await tester.pumpAndSettle();
+
+    final saved = goals.goalById(goal.id)!;
+    expect(
+      saved.completionFor(goals.today)?.amount,
+      closeTo(planned / 2, .001),
+    );
+    expect(
+      saved.completionFor(goals.today)?.record?.amountCompleted,
+      closeTo(planned / 2, .001),
+    );
   });
 }

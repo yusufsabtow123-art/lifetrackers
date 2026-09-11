@@ -41,10 +41,17 @@ class TaskCompletionPage extends StatefulWidget {
 
 class _TaskCompletionPageState extends State<TaskCompletionPage> {
   late final TextEditingController _notes;
+  late final TextEditingController _amountCompleted;
+  final _scrollController = ScrollController();
+  final _notesKey = GlobalKey();
+  final _amountKey = GlobalKey();
   late TaskCompletionNote _record;
   late List<LifeAttachment> _attachments;
   late List<CompletionPerson> _people;
   bool _saving = false;
+  bool _notesError = false;
+  bool _amountError = false;
+  String? _validationMessage;
 
   @override
   void initState() {
@@ -75,6 +82,11 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
           locationName: widget.task?.location ?? '',
         );
     _notes = TextEditingController(text: _record.text);
+    _amountCompleted = TextEditingController(
+      text: _record.amountCompleted == null
+          ? ''
+          : _editableNumber(_record.amountCompleted!),
+    );
     _attachments = _record.attachments.toList();
     _people = _record.people.toList();
   }
@@ -94,9 +106,23 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
 
   String get _title => widget.task?.title ?? widget.goal!.name;
 
+  double? get _plannedAmount {
+    final goal = widget.goal;
+    if (goal?.plan == null) return null;
+    final amount = widget.goalStore!.calculator.actionForDate(
+      goal!,
+      widget.day,
+    );
+    return amount > 0 ? amount : null;
+  }
+
+  String get _progressUnit => widget.goal?.plan?.unit ?? 'units';
+
   @override
   void dispose() {
     _notes.dispose();
+    _amountCompleted.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -110,29 +136,63 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
       body: SafeArea(
         child: Stack(
           children: [
-            const Positioned.fill(
-              child: IgnorePointer(child: _ContourBackdrop()),
-            ),
+            if (context.isDarkMode)
+              const Positioned.fill(
+                child: IgnorePointer(child: _ContourBackdrop()),
+              ),
             Column(
               children: [
                 _CompletionAppBar(onCopy: _copySummary),
                 Expanded(
                   child: CustomScrollView(
+                    controller: _scrollController,
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     slivers: [
                       SliverToBoxAdapter(child: _buildHeader(late)),
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(22, 0, 22, 24),
+                        padding: EdgeInsets.fromLTRB(
+                          context.isDarkMode ? 22 : 12,
+                          0,
+                          context.isDarkMode ? 22 : 12,
+                          24,
+                        ),
                         sliver: SliverList.list(
                           children: [
                             _OutcomeSection(
                               value: _record.outcome,
-                              onChanged: (value) => setState(
-                                () =>
-                                    _record = _record.copyWith(outcome: value),
-                              ),
+                              onChanged: (value) => setState(() {
+                                _record = _record.copyWith(outcome: value);
+                                _notesError = false;
+                                _amountError = false;
+                                _validationMessage = null;
+                              }),
                             ),
+                            if (_record.outcome ==
+                                TaskCompletionOutcome.partiallyCompleted)
+                              _PartialProgressSection(
+                                key: _amountKey,
+                                controller: _amountCompleted,
+                                plannedAmount: _plannedAmount,
+                                unit: _progressUnit,
+                                hasError: _amountError,
+                              ),
+                            if (_validationMessage != null)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 44,
+                                  right: 4,
+                                  bottom: 10,
+                                ),
+                                child: Text(
+                                  _validationMessage!,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                             _RecordDivider(),
                             _RecordRow(
                               icon: Icons.calendar_today_outlined,
@@ -150,7 +210,9 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
                             _TimeSection(record: _record, onTap: _editTimes),
                             _RecordDivider(),
                             _NotesSection(
+                              key: _notesKey,
                               controller: _notes,
+                              hasError: _notesError,
                               onAddLink: _addLink,
                               onAddImage: () => _addAttachment(imageOnly: true),
                               onAddFile: _addAttachment,
@@ -204,57 +266,158 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
     );
   }
 
-  Widget _buildHeader(bool late) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.fromLTRB(22, 10, 22, 22),
-    decoration: BoxDecoration(
-      border: Border(
-        bottom: BorderSide(color: context.appBorder.withValues(alpha: .72)),
-      ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _title,
-          style: const TextStyle(
-            fontSize: 25,
-            height: 1.15,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -.45,
+  Widget _buildHeader(bool late) {
+    if (context.isDarkMode) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(22, 10, 22, 22),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: context.appBorder.withValues(alpha: .72)),
           ),
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 8,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _StatusPill(
-              icon: Icons.check_rounded,
-              label: _record.outcome.label,
-              color: _record.outcome == TaskCompletionOutcome.skipped
-                  ? context.appMuted
-                  : const Color(0xFF73DA90),
-            ),
-            if (late)
-              const _StatusPill(
-                icon: Icons.schedule_rounded,
-                label: 'Late',
-                color: AppColors.coral,
+            Text(
+              _title,
+              style: const TextStyle(
+                fontSize: 25,
+                height: 1.15,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -.45,
               ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                _StatusPill(
+                  icon: Icons.check_rounded,
+                  label: _record.outcome.label,
+                  color: _record.outcome == TaskCompletionOutcome.skipped
+                      ? context.appMuted
+                      : const Color(0xFF73DA90),
+                ),
+                if (late)
+                  const _StatusPill(
+                    icon: Icons.schedule_rounded,
+                    label: 'Late',
+                    color: AppColors.coral,
+                  ),
+              ],
+            ),
           ],
         ),
-      ],
-    ),
-  );
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 7),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: context.appPanel,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: context.appBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: AppColors.softAmber,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.menu_book_outlined,
+                color: AppColors.goldText,
+                size: 23,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 5,
+                    children: [
+                      _CompactStatusPill(
+                        icon: Icons.check_circle_rounded,
+                        label: _record.outcome.label,
+                        color: _record.outcome == TaskCompletionOutcome.skipped
+                            ? context.appMuted
+                            : AppColors.greenText,
+                        background: context.appSoftGreen,
+                      ),
+                      if (late)
+                        _CompactStatusPill(
+                          icon: Icons.schedule_rounded,
+                          label: 'Late',
+                          color: AppColors.coralText,
+                          background: context.appSoftRed,
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _save() async {
     if (_saving) return;
+    final partial = _record.outcome == TaskCompletionOutcome.partiallyCompleted;
+    final enteredAmount = double.tryParse(_amountCompleted.text.trim());
+    final plannedAmount = _plannedAmount;
+    if (partial && plannedAmount != null) {
+      final invalid =
+          enteredAmount == null ||
+          enteredAmount <= 0 ||
+          enteredAmount >= plannedAmount;
+      if (invalid) {
+        setState(() {
+          _amountError = true;
+          _notesError = false;
+          _validationMessage =
+              'Not completed — enter an amount greater than 0 and less than ${_editableNumber(plannedAmount)} $_progressUnit.';
+        });
+        await _reveal(_amountKey);
+        return;
+      }
+    } else if (partial && _notes.text.trim().isEmpty) {
+      setState(() {
+        _notesError = true;
+        _amountError = false;
+        _validationMessage =
+            'Not completed — add a note explaining what was completed.';
+      });
+      await _reveal(_notesKey);
+      return;
+    }
     setState(() => _saving = true);
     final updated = _record.copyWith(
       text: _notes.text.trim(),
       attachments: _attachments,
       people: _people,
+      amountCompleted: partial && plannedAmount != null ? enteredAmount : null,
+      clearAmountCompleted: !partial || plannedAmount == null,
     );
     if (widget.task != null) {
       await widget.store!.saveTaskCompletionRecord(widget.task!, updated);
@@ -267,6 +430,18 @@ class _TaskCompletionPageState extends State<TaskCompletionPage> {
     if (!mounted) return;
     HapticFeedback.lightImpact();
     Navigator.pop(context, true);
+  }
+
+  Future<void> _reveal(GlobalKey key) async {
+    await Future<void>.delayed(Duration.zero);
+    final target = key.currentContext;
+    if (target == null || !target.mounted) return;
+    await Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      alignment: .18,
+    );
   }
 
   Future<void> _copySummary() async {
@@ -498,7 +673,7 @@ class _CompletionAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 62,
+    height: context.isDarkMode ? 62 : 52,
     child: Row(
       children: [
         const SizedBox(width: 6),
@@ -508,11 +683,11 @@ class _CompletionAppBar extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_rounded, size: 28),
         ),
         const SizedBox(width: 8),
-        const Expanded(
+        Expanded(
           child: Text(
             'Completion record',
             style: TextStyle(
-              fontSize: 22,
+              fontSize: context.isDarkMode ? 22 : 20,
               fontWeight: FontWeight.w700,
               letterSpacing: -.35,
             ),
@@ -574,6 +749,43 @@ class _StatusPill extends StatelessWidget {
   );
 }
 
+class _CompactStatusPill extends StatelessWidget {
+  const _CompactStatusPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.background,
+  });
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(30),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _OutcomeSection extends StatelessWidget {
   const _OutcomeSection({required this.value, required this.onChanged});
   final TaskCompletionOutcome value;
@@ -581,23 +793,26 @@ class _OutcomeSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 14),
+    padding: EdgeInsets.symmetric(vertical: context.isDarkMode ? 14 : 9),
     child: Column(
       children: [
         const _RowHeading(icon: Icons.outlined_flag_rounded, label: 'Outcome'),
-        const SizedBox(height: 11),
+        SizedBox(height: context.isDarkMode ? 11 : 6),
         Padding(
           padding: const EdgeInsets.only(left: 44),
           child: _Segmented<TaskCompletionOutcome>(
             values: TaskCompletionOutcome.values,
             selected: value,
             label: (item) => item.label,
+            itemKey: (item) => Key('completion-outcome-${item.name}'),
             icon: (item) => switch (item) {
               TaskCompletionOutcome.completed => Icons.check_circle_rounded,
               TaskCompletionOutcome.partiallyCompleted => Icons.circle_outlined,
               TaskCompletionOutcome.skipped => Icons.cancel_outlined,
             },
-            activeColor: const Color(0xFF73DA90),
+            activeColor: context.isDarkMode
+                ? const Color(0xFF73DA90)
+                : AppColors.greenText,
             onChanged: onChanged,
           ),
         ),
@@ -624,7 +839,7 @@ class _RecordRow extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
     child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: EdgeInsets.symmetric(vertical: context.isDarkMode ? 14 : 9),
       child: Row(
         children: [
           Icon(icon, size: 23, color: context.appText),
@@ -658,7 +873,7 @@ class _TimeSection extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: EdgeInsets.symmetric(vertical: context.isDarkMode ? 14 : 9),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -679,8 +894,8 @@ class _TimeSection extends StatelessWidget {
                     actual == null
                         ? 'Not tracked'
                         : '${actual.inMinutes} min actual',
-                    style: const TextStyle(
-                      fontSize: 21,
+                    style: TextStyle(
+                      fontSize: context.isDarkMode ? 21 : 17,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -722,21 +937,66 @@ class _TimeSection extends StatelessWidget {
   }
 }
 
+class _PartialProgressSection extends StatelessWidget {
+  const _PartialProgressSection({
+    super.key,
+    required this.controller,
+    required this.plannedAmount,
+    required this.unit,
+    required this.hasError,
+  });
+
+  final TextEditingController controller;
+  final double? plannedAmount;
+  final String unit;
+  final bool hasError;
+
+  @override
+  Widget build(BuildContext context) {
+    if (plannedAmount == null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(44, 0, 4, 12),
+        child: Text(
+          'This task has no numeric amount, so add a note describing the part you completed.',
+          style: TextStyle(fontSize: 12, color: context.appMuted, height: 1.3),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(44, 0, 4, 12),
+      child: TextField(
+        key: const Key('completion-partial-amount'),
+        controller: controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(
+          labelText: 'Amount completed',
+          hintText: 'Less than ${_editableNumber(plannedAmount!)}',
+          suffixText: unit,
+          errorText: hasError ? 'Enter the partial amount.' : null,
+        ),
+      ),
+    );
+  }
+}
+
 class _NotesSection extends StatelessWidget {
   const _NotesSection({
+    super.key,
     required this.controller,
+    required this.hasError,
     required this.onAddLink,
     required this.onAddImage,
     required this.onAddFile,
   });
   final TextEditingController controller;
+  final bool hasError;
   final VoidCallback onAddLink;
   final VoidCallback onAddImage;
   final VoidCallback onAddFile;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 14),
+    padding: EdgeInsets.symmetric(vertical: context.isDarkMode ? 14 : 9),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -758,14 +1018,19 @@ class _NotesSection extends StatelessWidget {
             decoration: BoxDecoration(
               color: context.appRaised.withValues(alpha: .55),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: context.appBorder),
+              border: Border.all(
+                color: hasError
+                    ? Theme.of(context).colorScheme.error
+                    : context.appBorder,
+                width: hasError ? 1.5 : 1,
+              ),
             ),
             child: Column(
               children: [
                 TextField(
                   key: const Key('completion-record-notes'),
                   controller: controller,
-                  minLines: 3,
+                  minLines: context.isDarkMode ? 3 : 2,
                   maxLines: 7,
                   style: const TextStyle(fontSize: 14, height: 1.4),
                   decoration: const InputDecoration(
@@ -776,6 +1041,21 @@ class _NotesSection extends StatelessWidget {
                     hintText: 'What happened? What did you learn?',
                   ),
                 ),
+                if (hasError)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 7),
+                      child: Text(
+                        'Not completed — A note is required when this task has no numeric amount.',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -918,7 +1198,7 @@ class _AttachmentsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 14),
+    padding: EdgeInsets.symmetric(vertical: context.isDarkMode ? 14 : 9),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -932,7 +1212,7 @@ class _AttachmentsSection extends StatelessWidget {
             Icon(Icons.expand_more_rounded, color: context.appMuted),
           ],
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: context.isDarkMode ? 10 : 6),
         Padding(
           padding: const EdgeInsets.only(left: 39, right: 30),
           child: Wrap(
@@ -1065,7 +1345,7 @@ class _PeopleSection extends StatelessWidget {
   final ValueChanged<CompletionPerson> onRemove;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 14),
+    padding: EdgeInsets.symmetric(vertical: context.isDarkMode ? 14 : 9),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1079,7 +1359,7 @@ class _PeopleSection extends StatelessWidget {
             Icon(Icons.expand_more_rounded, color: context.appMuted),
           ],
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: context.isDarkMode ? 10 : 6),
         Padding(
           padding: const EdgeInsets.only(left: 39, right: 30),
           child: Wrap(
@@ -1150,7 +1430,7 @@ class _EffortSection extends StatelessWidget {
   final ValueChanged<TaskCompletionEffort> onChanged;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 14),
+    padding: EdgeInsets.symmetric(vertical: context.isDarkMode ? 14 : 9),
     child: Row(
       children: [
         const Icon(Icons.bar_chart_rounded, size: 24),
@@ -1181,11 +1461,13 @@ class _Segmented<T> extends StatelessWidget {
     required this.activeColor,
     required this.onChanged,
     this.icon,
+    this.itemKey,
   });
   final List<T> values;
   final T selected;
   final String Function(T) label;
   final IconData Function(T)? icon;
+  final Key Function(T)? itemKey;
   final Color activeColor;
   final ValueChanged<T> onChanged;
   @override
@@ -1194,6 +1476,7 @@ class _Segmented<T> extends StatelessWidget {
       for (var index = 0; index < values.length; index++)
         Expanded(
           child: InkWell(
+            key: itemKey?.call(values[index]),
             onTap: () => onChanged(values[index]),
             borderRadius: BorderRadius.horizontal(
               left: index == 0 ? const Radius.circular(9) : Radius.zero,
@@ -1203,7 +1486,7 @@ class _Segmented<T> extends StatelessWidget {
             ),
             child: AnimatedContainer(
               duration: LifeMotion.quick,
-              height: 46,
+              height: context.isDarkMode ? 46 : 38,
               decoration: BoxDecoration(
                 color: values[index] == selected
                     ? activeColor.withValues(alpha: .12)
@@ -1321,7 +1604,13 @@ class _SaveBar extends StatelessWidget {
   final VoidCallback onSave;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(22, 10, 22, 12),
+    width: double.infinity,
+    padding: EdgeInsets.fromLTRB(
+      context.isDarkMode ? 22 : 12,
+      context.isDarkMode ? 10 : 7,
+      context.isDarkMode ? 22 : 12,
+      context.isDarkMode ? 12 : 8,
+    ),
     decoration: BoxDecoration(
       color: (context.isDarkMode ? const Color(0xFF0B1013) : context.appPanel)
           .withValues(alpha: .97),
@@ -1330,13 +1619,13 @@ class _SaveBar extends StatelessWidget {
       ),
     ),
     child: SizedBox(
-      height: 50,
+      height: context.isDarkMode ? 50 : 46,
       child: FilledButton(
         key: const Key('save-completion-record'),
         onPressed: saving ? null : onSave,
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.coral,
-          foregroundColor: Colors.black,
+          foregroundColor: context.isDarkMode ? Colors.black : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
@@ -1403,6 +1692,13 @@ class _ContourPainter extends CustomPainter {
   @override
   bool shouldRepaint(_ContourPainter oldDelegate) => oldDelegate.color != color;
 }
+
+String _editableNumber(double value) => value == value.roundToDouble()
+    ? value.toInt().toString()
+    : value
+          .toStringAsFixed(2)
+          .replaceFirst(RegExp(r'0+$'), '')
+          .replaceFirst(RegExp(r'\.$'), '');
 
 class _TimeEditResult {
   const _TimeEditResult({

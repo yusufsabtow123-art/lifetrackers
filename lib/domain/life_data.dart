@@ -280,6 +280,7 @@ class TaskCompletionNote {
     this.longitude,
     this.people = const [],
     this.effort = TaskCompletionEffort.normal,
+    this.amountCompleted,
   });
 
   final DateTime day;
@@ -297,6 +298,7 @@ class TaskCompletionNote {
   final double? longitude;
   final List<CompletionPerson> people;
   final TaskCompletionEffort effort;
+  final double? amountCompleted;
 
   bool get isLate {
     final actual = actualEndAt ?? recordedAt;
@@ -325,6 +327,8 @@ class TaskCompletionNote {
     bool clearLongitude = false,
     List<CompletionPerson>? people,
     TaskCompletionEffort? effort,
+    double? amountCompleted,
+    bool clearAmountCompleted = false,
   }) => TaskCompletionNote(
     day: day ?? this.day,
     recordedAt: recordedAt ?? this.recordedAt,
@@ -347,6 +351,9 @@ class TaskCompletionNote {
     longitude: clearLongitude ? null : longitude ?? this.longitude,
     people: people ?? this.people,
     effort: effort ?? this.effort,
+    amountCompleted: clearAmountCompleted
+        ? null
+        : amountCompleted ?? this.amountCompleted,
   );
 
   Map<String, Object?> toJson() => {
@@ -365,6 +372,7 @@ class TaskCompletionNote {
     'longitude': longitude,
     'people': people.map((item) => item.toJson()).toList(),
     'effort': effort.name,
+    'amountCompleted': amountCompleted,
   };
 
   factory TaskCompletionNote.fromJson(Map<String, Object?> json) =>
@@ -396,6 +404,7 @@ class TaskCompletionNote {
             )
             .toList(),
         effort: TaskCompletionEffort.parse(json['effort'] as String?),
+        amountCompleted: (json['amountCompleted'] as num?)?.toDouble(),
       );
 }
 
@@ -427,6 +436,7 @@ class CalendarEntry {
     required this.end,
     required this.kind,
     this.location = '',
+    this.notes = '',
     this.enabled = true,
     this.spaceId = LifeSpace.personalId,
     this.repeat = CalendarRepeat.none,
@@ -443,6 +453,7 @@ class CalendarEntry {
   final DateTime end;
   final CalendarEntryKind kind;
   final String location;
+  final String notes;
   final bool enabled;
   final String spaceId;
   final CalendarRepeat repeat;
@@ -506,6 +517,7 @@ class CalendarEntry {
     DateTime? end,
     CalendarEntryKind? kind,
     String? location,
+    String? notes,
     bool? enabled,
     String? spaceId,
     CalendarRepeat? repeat,
@@ -523,6 +535,7 @@ class CalendarEntry {
     end: end ?? this.end,
     kind: kind ?? this.kind,
     location: location ?? this.location,
+    notes: notes ?? this.notes,
     enabled: enabled ?? this.enabled,
     spaceId: spaceId ?? this.spaceId,
     repeat: repeat ?? this.repeat,
@@ -540,6 +553,7 @@ class CalendarEntry {
     'end': end.toIso8601String(),
     'kind': kind.name,
     'location': location,
+    'notes': notes,
     'enabled': enabled,
     'spaceId': spaceId,
     'repeat': repeat.name,
@@ -560,6 +574,7 @@ class CalendarEntry {
       orElse: () => CalendarEntryKind.event,
     ),
     location: json['location'] as String? ?? '',
+    notes: json['notes'] as String? ?? '',
     enabled: json['enabled'] as bool? ?? true,
     spaceId: json['spaceId'] as String? ?? LifeSpace.personalId,
     repeat: CalendarRepeat.parse(json['repeat'] as String?),

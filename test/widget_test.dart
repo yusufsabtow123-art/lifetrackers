@@ -175,10 +175,10 @@ void main() {
       '502',
     );
     expect(
-      find.textContaining('102 of 604 pages complete · 17%'),
+      find.textContaining('102 of 604 Books complete · 17%'),
       findsOneWidget,
     );
-    expect(find.textContaining('502 pages remaining'), findsOneWidget);
+    expect(find.textContaining('502 Books remaining'), findsOneWidget);
 
     tester
         .widget<Switch>(
@@ -825,7 +825,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(settings.salahEnabled, isTrue);
-    expect(find.text('ISNA · North America'), findsOneWidget);
+    expect(find.text('ISNA'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Board and categories'));

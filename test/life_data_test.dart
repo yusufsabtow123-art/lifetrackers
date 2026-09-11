@@ -309,6 +309,25 @@ bad row
     expect(restored.copyWith(colorValue: 0xFF9B66D9).colorValue, 0xFF9B66D9);
   });
 
+  test('calendar notes remain attached to their event', () async {
+    final repository = MemoryLifeRepository();
+    final store = LifeStore(repository);
+    await store.load();
+    await store.addCalendarEntry(
+      title: 'Client outreach',
+      start: DateTime(2027, 3, 1, 11),
+      end: DateTime(2027, 3, 1, 12),
+      kind: CalendarEntryKind.event,
+      notes: 'Deep work on Q2 planning and strategy. No meetings.',
+    );
+
+    final restored = LifeData.fromJson(repository.data.toJson());
+    expect(
+      restored.calendar.single.notes,
+      'Deep work on Q2 planning and strategy. No meetings.',
+    );
+  });
+
   test(
     'advanced schedule import preserves category details and skips duplicates',
     () async {

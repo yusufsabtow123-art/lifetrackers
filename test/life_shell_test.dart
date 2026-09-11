@@ -12,6 +12,61 @@ import 'package:goal_tracker_poc/domain/life_data.dart';
 import 'package:goal_tracker_poc/ui/goal_app.dart';
 
 void main() {
+  testWidgets('light Spaces page opens without a material shape conflict', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final goals = GoalStore(repository: MemoryGoalRepository());
+    await goals.load();
+    final lifeStore = LifeStore(MemoryLifeRepository());
+    await lifeStore.load();
+    final settings = AppSettingsController(MemoryAppSettingsRepository());
+    await settings.load();
+    await settings.setAppearance(AppAppearance.light);
+
+    await tester.pumpWidget(
+      GoalApp(store: goals, lifeStore: lifeStore, settingsController: settings),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('More').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Spaces and people'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Spaces'), findsOneWidget);
+    expect(find.text('Personal Space'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('light Log opens its full-page journal editor', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final goals = GoalStore(repository: MemoryGoalRepository());
+    await goals.load();
+    final lifeStore = LifeStore(MemoryLifeRepository());
+    await lifeStore.load();
+    final settings = AppSettingsController(MemoryAppSettingsRepository());
+    await settings.load();
+    await settings.setAppearance(AppAppearance.light);
+
+    await tester.pumpWidget(
+      GoalApp(store: goals, lifeStore: lifeStore, settingsController: settings),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('More').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Log'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Write a journal entry'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('New log entry'), findsOneWidget);
+    expect(find.byKey(const Key('new-log-notes')), findsOneWidget);
+    expect(find.byKey(const Key('save-new-log-entry')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('enabling Salah makes prayer blocks visible in Calendar', (
     tester,
   ) async {

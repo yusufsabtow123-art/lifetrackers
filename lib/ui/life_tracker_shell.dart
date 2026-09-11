@@ -181,11 +181,7 @@ class LifeTrackerShellState extends State<LifeTrackerShell> {
             ),
   };
 
-  Future<void> _showSpaces() => Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (context) => SpacesPage(store: widget.lifeStore),
-    ),
-  );
+  void _showSpaces() => setState(() => _destination = _Destination.spaces);
 }
 
 class _LifeBottomBar extends StatelessWidget {
@@ -1639,47 +1635,36 @@ class SpacesPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          _SurfaceTile(
-            icon: Icons.account_circle_outlined,
-            leading: CircleAvatar(
-              radius: 22,
-              backgroundImage: active.profileImagePath.isEmpty
-                  ? null
-                  : FileImage(File(active.profileImagePath)),
-              child: active.profileImagePath.isEmpty
-                  ? const Icon(Icons.person_outline_rounded)
-                  : null,
-            ),
-            title: 'Your profile picture',
-            subtitle: active.profileImagePath.isEmpty
-                ? 'Add a photo'
-                : 'Tap to change · Long press to remove',
-            onTap: () => _chooseProfileImage(context),
-            onLongPress: active.profileImagePath.isEmpty
-                ? null
-                : () => store.setProfileImage(null),
-          ),
-          const SizedBox(height: 8),
           for (final space in store.spaces.where(
             (s) => s.isShared == active.isShared,
           ))
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Material(
-                color: context.appRaised.withValues(alpha: .9),
+                color: context.appPanel,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(11),
                   side: BorderSide(color: context.appBorder),
                 ),
-                borderRadius: BorderRadius.circular(10),
                 child: ListTile(
-                  leading: Icon(
-                    space.isShared ? Icons.group_outlined : Icons.lock_outline,
-                    size: 23,
+                  leading: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: context.appSoftBlue,
+                    child: Icon(
+                      space.isShared ? Icons.group_rounded : Icons.lock_outline,
+                      size: 22,
+                      color: context.appBlueText,
+                    ),
                   ),
-                  title: Text(space.name, style: const TextStyle(fontSize: 14)),
-                  subtitle: const Text(
-                    'Private · On this device',
+                  title: Text(
+                    space.name,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${space.isShared ? '${space.members.length} members' : 'Private'} · On this device',
                     style: TextStyle(fontSize: 11),
                   ),
                   trailing: Icon(
@@ -1718,6 +1703,38 @@ class SpacesPage extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SizedBox(
+                    width: 76,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(36),
+                      onTap: () => _chooseProfileImage(context),
+                      onLongPress: active.profileImagePath.isEmpty
+                          ? null
+                          : () => store.setProfileImage(null),
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 23,
+                            backgroundColor: AppColors.softRed,
+                            backgroundImage: active.profileImagePath.isEmpty
+                                ? null
+                                : FileImage(File(active.profileImagePath)),
+                            child: active.profileImagePath.isEmpty
+                                ? const Text(
+                                    'You',
+                                    style: TextStyle(
+                                      color: AppColors.coralText,
+                                      fontSize: 11,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(height: 7),
+                          const Text('You', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ),
                   for (final member in active.members)
                     SizedBox(
                       width: 76,
@@ -1788,59 +1805,16 @@ class SpacesPage extends StatelessWidget {
                 ),
             ],
           ],
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: context.appRaised.withValues(alpha: .66),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: context.appBorder),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.lock_outline_rounded,
-                  size: 18,
-                  color: context.appMuted,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Spaces are private and stored on this device. Online invitations and syncing are not available yet.',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: context.appMuted),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       );
-      if (mobile) {
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Spaces'),
-            centerTitle: false,
-            actions: [
-              IconButton(
-                tooltip: 'Create space',
-                onPressed: () => _createSharedSpace(context),
-                icon: const Icon(Icons.add_rounded),
-              ),
-            ],
-          ),
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              child: body,
-            ),
-          ),
-        );
-      }
       return _PageFrame(
         title: 'Spaces',
         subtitle: 'Keep life organized. Share what matters.',
+        action: IconButton(
+          tooltip: 'Create space',
+          onPressed: () => _createSharedSpace(context),
+          icon: const Icon(Icons.add_rounded),
+        ),
         child: Align(
           alignment: Alignment.topLeft,
           child: ConstrainedBox(
@@ -2041,24 +2015,16 @@ class _LogPageState extends State<LogPage> {
             ),
           ),
           const SizedBox(height: 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final option in const {
-                  'all': 'All',
-                  'tasks': 'Tasks',
-                  'goals': 'Goals',
-                  'journal': 'Journal',
-                }.entries) ...[
-                  ChoiceChip(
-                    label: Text(option.value),
-                    selected: _filter == option.key,
-                    onSelected: (_) => setState(() => _filter = option.key),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ],
+          _TextTabs(
+            labels: const ['All', 'Tasks', 'Goals', 'Journal'],
+            selected: const [
+              'all',
+              'tasks',
+              'goals',
+              'journal',
+            ].indexOf(_filter),
+            onSelected: (index) => setState(
+              () => _filter = const ['all', 'tasks', 'goals', 'journal'][index],
             ),
           ),
           const SizedBox(height: 14),
@@ -2086,27 +2052,38 @@ class _LogPageState extends State<LogPage> {
                           : widget.goalStore.goals
                                 .where((item) => item.id == entry.goalId)
                                 .firstOrNull;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _SurfaceTile(
-                          icon: entry.kind == LifeLogKind.journal
-                              ? Icons.edit_note_rounded
-                              : Icons.check_circle_outline_rounded,
-                          title: task?.title ?? goal?.name ?? 'Journal',
-                          subtitle: [
-                            _friendlyDate(entry.createdAt),
-                            if (goal != null && task != null) goal.name,
-                            if (entry.text.isNotEmpty) entry.text,
-                            if (entry.attachments.isNotEmpty)
-                              '${entry.attachments.length} attachment${entry.attachments.length == 1 ? '' : 's'}',
-                          ].join(' · '),
-                          onTap: () => _showEntry(
-                            context,
-                            entry,
-                            taskTitle: task?.title,
-                            goalTitle: goal?.name,
+                      final showHeading =
+                          index == 0 ||
+                          !_sameDate(
+                            visible[index - 1].createdAt,
+                            entry.createdAt,
+                          );
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (showHeading)
+                            _LogDayHeader(
+                              date: entry.createdAt,
+                              today: widget.goalStore.today,
+                            ),
+                          _LogTimelineTile(
+                            entry: entry,
+                            title: task?.title ?? goal?.name ?? 'Journal',
+                            contextLine: goal != null && task != null
+                                ? 'Goal: ${goal.name}'
+                                : entry.kind == LifeLogKind.journal
+                                ? 'Journal'
+                                : task == null
+                                ? 'Goal progress'
+                                : 'Completed',
+                            onTap: () => _showEntry(
+                              context,
+                              entry,
+                              taskTitle: task?.title,
+                              goalTitle: goal?.name,
+                            ),
                           ),
-                        ),
+                        ],
                       );
                     },
                   ),
@@ -2200,6 +2177,15 @@ class _LogPageState extends State<LogPage> {
   );
 
   Future<void> _addJournal(BuildContext context) async {
+    if (!context.isDarkMode) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => _NewLogEntryPage(store: widget.lifeStore),
+        ),
+      );
+      return;
+    }
     final controller = TextEditingController();
     final attachments = <LifeAttachment>[];
     await showModalBottomSheet<void>(
@@ -2226,6 +2212,11 @@ class _LogPageState extends State<LogPage> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 12),
+                const Text(
+                  'What happened?',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
                 TextField(
                   controller: controller,
                   autofocus: true,
@@ -2246,47 +2237,114 @@ class _LogPageState extends State<LogPage> {
                       }
                     },
                   ),
-                  decoration: InputDecoration(
-                    hintText: 'What happened?',
-                    suffixIcon: SpeechInputButton(controller: controller),
+                  decoration: const InputDecoration(
+                    hintText: 'Write a note about your day…',
                   ),
                 ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                Row(
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final item = await AttachmentPicker.choose(
-                          imageOnly: true,
-                        );
-                        if (item != null) {
-                          setSheetState(() => attachments.add(item));
-                        }
-                      },
-                      icon: const Icon(Icons.image_outlined),
-                      label: const Text('Photo'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final item = await AttachmentPicker.choose();
-                        if (item != null) {
-                          setSheetState(() => attachments.add(item));
-                        }
-                      },
-                      icon: const Icon(Icons.attach_file_rounded),
-                      label: const Text('File'),
-                    ),
-                    for (final attachment in attachments)
-                      InputChip(
-                        label: Text(attachment.name),
-                        onSelected: (_) => AttachmentPicker.open(attachment),
-                        onDeleted: () =>
-                            setSheetState(() => attachments.remove(attachment)),
+                    Expanded(
+                      child: _TaskNoteControl(
+                        tooltip: 'Add link',
+                        height: 54,
+                        onPressed: () => _addJournalLink(controller),
+                        child: const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.link_rounded, size: 19),
+                            Text('Link', style: TextStyle(fontSize: 10)),
+                          ],
+                        ),
                       ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _TaskNoteControl(
+                        tooltip: 'Dictate note',
+                        height: 54,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SpeechInputButton(
+                              controller: controller,
+                              compact: true,
+                            ),
+                            const Text('Voice', style: TextStyle(fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _TaskNoteControl(
+                        tooltip: 'Add image',
+                        height: 54,
+                        onPressed: () async {
+                          final item = await AttachmentPicker.choose(
+                            imageOnly: true,
+                          );
+                          if (item != null) {
+                            setSheetState(() => attachments.add(item));
+                          }
+                        },
+                        child: const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.image_outlined, size: 19),
+                            Text('Image', style: TextStyle(fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _TaskNoteControl(
+                        tooltip: 'Add file',
+                        height: 54,
+                        onPressed: () async {
+                          final item = await AttachmentPicker.choose();
+                          if (item != null) {
+                            setSheetState(() => attachments.add(item));
+                          }
+                        },
+                        child: const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.description_outlined, size: 19),
+                            Text('File', style: TextStyle(fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
+                for (final attachment in attachments)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading:
+                        attachment.kind == LifeAttachmentKind.image &&
+                            File(attachment.path).existsSync()
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.file(
+                              File(attachment.path),
+                              width: 42,
+                              height: 42,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : const Icon(Icons.description_outlined),
+                    title: Text(attachment.name),
+                    subtitle: Text(_fileSize(attachment.sizeBytes)),
+                    trailing: IconButton(
+                      tooltip: 'Remove attachment',
+                      onPressed: () =>
+                          setSheetState(() => attachments.remove(attachment)),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                    onTap: () => AttachmentPicker.open(attachment),
+                  ),
                 const SizedBox(height: 12),
                 FilledButton(
                   onPressed: () async {
@@ -2296,6 +2354,10 @@ class _LogPageState extends State<LogPage> {
                     );
                     if (sheetContext.mounted) Navigator.pop(sheetContext);
                   },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.coral,
+                    foregroundColor: Colors.white,
+                  ),
                   child: const Text('Save to Log'),
                 ),
               ],
@@ -2305,6 +2367,425 @@ class _LogPageState extends State<LogPage> {
       ),
     );
     controller.dispose();
+  }
+
+  Future<void> _addJournalLink(TextEditingController notes) async {
+    final controller = TextEditingController(text: 'https://');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add link'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(hintText: 'https://example.com'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.isEmpty) return;
+    final separator = notes.text.trim().isEmpty ? '' : '\n';
+    notes.text = '${notes.text}$separator$result';
+    notes.selection = TextSelection.collapsed(offset: notes.text.length);
+  }
+}
+
+class _NewLogEntryPage extends StatefulWidget {
+  const _NewLogEntryPage({required this.store});
+
+  final LifeStore store;
+
+  @override
+  State<_NewLogEntryPage> createState() => _NewLogEntryPageState();
+}
+
+class _NewLogEntryPageState extends State<_NewLogEntryPage> {
+  final _notes = TextEditingController();
+  final _attachments = <LifeAttachment>[];
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _notes.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      leading: IconButton(
+        tooltip: 'Back',
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.arrow_back_rounded),
+      ),
+      title: const Text('New log entry'),
+    ),
+    body: SafeArea(
+      top: false,
+      child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 20),
+        children: [
+          const Text(
+            'What happened?',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            key: const Key('new-log-notes'),
+            controller: _notes,
+            autofocus: true,
+            minLines: 5,
+            maxLines: 10,
+            contentInsertionConfiguration: ContentInsertionConfiguration(
+              allowedMimeTypes: const [
+                'image/png',
+                'image/jpeg',
+                'image/gif',
+                'image/webp',
+              ],
+              onContentInserted: (content) async {
+                final attachment = await AttachmentPicker.importKeyboardContent(
+                  content,
+                );
+                if (attachment != null && mounted) {
+                  setState(() => _attachments.add(attachment));
+                }
+              },
+            ),
+            decoration: const InputDecoration(
+              hintText:
+                  'Had a productive morning session. What happened, what did you learn, and what comes next?',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _entryControl(
+                label: 'Link',
+                icon: Icons.link_rounded,
+                onPressed: _addLink,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: _TaskNoteControl(
+                  tooltip: 'Dictate note',
+                  height: 54,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SpeechInputButton(controller: _notes, compact: true),
+                      const Text('Voice', style: TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 7),
+              _entryControl(
+                label: 'Image',
+                icon: Icons.image_outlined,
+                onPressed: () => _pickAttachment(imageOnly: true),
+              ),
+              const SizedBox(width: 7),
+              _entryControl(
+                label: 'File',
+                icon: Icons.description_outlined,
+                onPressed: _pickAttachment,
+              ),
+            ],
+          ),
+          for (final attachment in _attachments)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading:
+                  attachment.kind == LifeAttachmentKind.image &&
+                      File(attachment.path).existsSync()
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.file(
+                        File(attachment.path),
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : const Icon(Icons.description_outlined),
+              title: Text(
+                attachment.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(_fileSize(attachment.sizeBytes)),
+              trailing: IconButton(
+                tooltip: 'Remove attachment',
+                onPressed: () => setState(
+                  () => _attachments.removeWhere(
+                    (item) => item.id == attachment.id,
+                  ),
+                ),
+                icon: const Icon(Icons.close_rounded),
+              ),
+              onTap: () => AttachmentPicker.open(attachment),
+            ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 50,
+            child: FilledButton(
+              key: const Key('save-new-log-entry'),
+              onPressed: _saving ? null : _save,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.coral,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(_saving ? 'Saving…' : 'Save to Log'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _entryControl({
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) => Expanded(
+    child: _TaskNoteControl(
+      tooltip: 'Add ${label.toLowerCase()}',
+      height: 54,
+      onPressed: onPressed,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 19),
+          Text(label, style: const TextStyle(fontSize: 10)),
+        ],
+      ),
+    ),
+  );
+
+  Future<void> _pickAttachment({bool imageOnly = false}) async {
+    final item = await AttachmentPicker.choose(imageOnly: imageOnly);
+    if (item != null && mounted) setState(() => _attachments.add(item));
+  }
+
+  Future<void> _addLink() async {
+    final input = TextEditingController(text: 'https://');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add link'),
+        content: TextField(
+          controller: input,
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(hintText: 'https://example.com'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, input.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    input.dispose();
+    if (result == null || result.isEmpty) return;
+    final separator = _notes.text.trim().isEmpty ? '' : '\n';
+    _notes.text = '${_notes.text}$separator$result';
+    _notes.selection = TextSelection.collapsed(offset: _notes.text.length);
+  }
+
+  Future<void> _save() async {
+    if (_saving || _notes.text.trim().isEmpty) return;
+    setState(() => _saving = true);
+    await widget.store.addJournalEntry(_notes.text, attachments: _attachments);
+    if (mounted) Navigator.pop(context);
+  }
+}
+
+class _LogDayHeader extends StatelessWidget {
+  const _LogDayHeader({required this.date, required this.today});
+  final DateTime date;
+  final DateTime today;
+
+  @override
+  Widget build(BuildContext context) {
+    final yesterday = today.subtract(const Duration(days: 1));
+    final label = _sameDate(date, today)
+        ? 'Today'
+        : _sameDate(date, yesterday)
+        ? 'Yesterday'
+        : '${_monthName(date.month)} ${date.day}, ${date.year}';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+          const Spacer(),
+          Text(
+            '${const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][date.weekday - 1]}, ${_monthName(date.month)} ${date.day}',
+            style: TextStyle(fontSize: 11, color: context.appMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LogTimelineTile extends StatelessWidget {
+  const _LogTimelineTile({
+    required this.entry,
+    required this.title,
+    required this.contextLine,
+    required this.onTap,
+  });
+  final LifeLogEntry entry;
+  final String title;
+  final String contextLine;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final journal = entry.kind == LifeLogKind.journal;
+    final color = journal
+        ? const Color(0xFFE5A800)
+        : entry.taskId != null
+        ? AppColors.blue
+        : AppColors.lightGreen;
+    final icon = journal
+        ? Icons.note_alt_outlined
+        : entry.taskId != null
+        ? Icons.phone_outlined
+        : Icons.check_rounded;
+    final time = TimeOfDay.fromDateTime(entry.createdAt).format(context);
+    return InkWell(
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 104),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 58,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 15),
+                child: Text(
+                  time,
+                  style: TextStyle(fontSize: 10.5, color: context.appMuted),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 20,
+              child: Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  Positioned.fill(
+                    left: 9,
+                    right: 9,
+                    child: ColoredBox(color: context.appBorder),
+                  ),
+                  Positioned(
+                    top: 17,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: context.appBorder)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: .14),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, size: 21, color: color),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            contextLine,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: context.appMuted,
+                            ),
+                          ),
+                          if (entry.text.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              entry.text,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                height: 1.35,
+                                color: context.appMuted,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.more_vert_rounded,
+                      size: 18,
+                      color: context.appMuted,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -2334,45 +2815,104 @@ class _MorePage extends StatelessWidget {
     subtitle: 'Spaces, AI, appearance, notifications, and your local files.',
     child: ListView(
       children: [
-        const _GroupLabel('SPACES'),
-        _SurfaceTile(
-          icon: Icons.group_outlined,
-          iconColor: context.isDarkMode ? null : AppColors.blueText,
-          title: 'Spaces and people',
-          subtitle: 'Personal and Shared Space',
-          onTap: onSpaces,
+        _MorePanel(
+          title: 'SPACES',
+          tint: context.appSoftRed,
+          titleColor: context.appDangerText,
+          children: [
+            _SurfaceTile(
+              icon: Icons.group_rounded,
+              iconColor: context.isDarkMode ? null : AppColors.blueText,
+              title: 'Spaces and people',
+              subtitle: 'Manage your spaces and members',
+              onTap: onSpaces,
+            ),
+          ],
         ),
-        const SizedBox(height: 22),
-        const _GroupLabel('TOOLS'),
-        _SurfaceTile(
-          icon: Icons.history_rounded,
-          iconColor: context.isDarkMode ? null : AppColors.greenText,
-          title: 'Log',
-          subtitle: 'Completion notes and your progress history',
-          onTap: onLog,
+        const SizedBox(height: 12),
+        _MorePanel(
+          title: 'TOOLS',
+          tint: context.appSoftBlue,
+          titleColor: context.appBlueText,
+          children: [
+            _SurfaceTile(
+              icon: Icons.assignment_outlined,
+              iconColor: context.isDarkMode ? null : AppColors.blueText,
+              title: 'Log',
+              subtitle: 'A history of what actually happened',
+              onTap: onLog,
+            ),
+            _SurfaceTile(
+              icon: Icons.auto_awesome_rounded,
+              iconColor: context.isDarkMode ? null : AppColors.blue,
+              title: 'AI',
+              subtitle: 'Work in progress',
+              onTap: onAi,
+            ),
+            _SurfaceTile(
+              icon: Icons.settings_outlined,
+              iconColor: context.isDarkMode ? null : context.appMuted,
+              title: 'Settings',
+              subtitle: 'Appearance, notifications, and more',
+              onTap: onSettings,
+            ),
+          ],
         ),
-        _SurfaceTile(
-          icon: Icons.auto_awesome_outlined,
-          iconColor: context.isDarkMode ? null : AppColors.blueText,
-          title: 'AI',
-          subtitle: 'Work in progress',
-          onTap: onAi,
+        const SizedBox(height: 12),
+        _MorePanel(
+          title: 'YOUR DATA',
+          tint: context.appSoftGreen,
+          titleColor: context.appGreenText,
+          children: [
+            _SurfaceTile(
+              icon: Icons.storage_rounded,
+              iconColor: context.isDarkMode ? null : context.appMuted,
+              title: 'Tasks and calendar file',
+              subtitle: 'On this device',
+            ),
+          ],
         ),
-        _SurfaceTile(
-          icon: Icons.settings_outlined,
-          iconColor: context.isDarkMode ? null : AppColors.coralText,
-          title: 'Settings',
-          subtitle: 'Appearance, notifications, goals, widgets, and files',
-          onTap: onSettings,
+      ],
+    ),
+  );
+}
+
+class _MorePanel extends StatelessWidget {
+  const _MorePanel({
+    required this.title,
+    required this.tint,
+    required this.titleColor,
+    required this.children,
+  });
+  final String title;
+  final Color tint;
+  final Color titleColor;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: context.appPanel,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: context.appBorder),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(13, 11, 13, 9),
+          color: tint,
+          child: Text(
+            title,
+            style: TextStyle(
+              color: titleColor,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
-        const SizedBox(height: 22),
-        const _GroupLabel('YOUR DATA'),
-        _SurfaceTile(
-          icon: Icons.description_outlined,
-          iconColor: context.isDarkMode ? null : AppColors.blueText,
-          title: 'Tasks and calendar file',
-          subtitle: lifeStore.storagePath,
-        ),
+        for (final child in children) child,
       ],
     ),
   );
@@ -2391,41 +2931,43 @@ class _AiPage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 98,
-              height: 92,
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: 8,
-                    top: 10,
-                    child: Icon(
-                      Icons.subject_outlined,
-                      size: 70,
-                      color: context.appMuted,
+            context.isDarkMode
+                ? SizedBox(
+                    width: 98,
+                    height: 92,
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          left: 8,
+                          top: 10,
+                          child: Icon(
+                            Icons.subject_outlined,
+                            size: 70,
+                            color: context.appMuted,
+                          ),
+                        ),
+                        const Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: LifeMark(size: 40),
+                        ),
+                        Positioned(
+                          right: 0,
+                          top: 4,
+                          child: LifeGlyphIcon(
+                            LifeGlyph.sparkle,
+                            size: 20,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: LifeMark(size: 40),
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 4,
-                    child: LifeGlyphIcon(
-                      LifeGlyph.sparkle,
-                      size: 20,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                  )
+                : const _AiReferenceIllustration(),
             const SizedBox(height: 24),
             const Text(
               'Work in progress',
-              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 16),
             Text(
@@ -2444,10 +2986,91 @@ class _AiPage extends StatelessWidget {
               style: TextStyle(fontSize: 13, color: context.appMuted),
             ),
             const SizedBox(height: 28),
-            FilledButton(onPressed: onPlan, child: const Text('Plan manually')),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: FilledButton(
+                onPressed: onPlan,
+                style: context.isDarkMode
+                    ? null
+                    : FilledButton.styleFrom(
+                        backgroundColor: context.appSoftRed,
+                        foregroundColor: AppColors.coralText,
+                        side: BorderSide(
+                          color: AppColors.coralText.withValues(alpha: .24),
+                        ),
+                      ),
+                child: const Text(
+                  'Plan manually',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
           ],
         ),
       ),
+    ),
+  );
+}
+
+class _AiReferenceIllustration extends StatelessWidget {
+  const _AiReferenceIllustration();
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 210,
+    height: 190,
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        Positioned(
+          bottom: 18,
+          child: Container(
+            width: 180,
+            height: 24,
+            decoration: const BoxDecoration(
+              color: AppColors.softBlue,
+              borderRadius: BorderRadius.all(Radius.elliptical(90, 12)),
+            ),
+          ),
+        ),
+        const Positioned(
+          left: 22,
+          top: 30,
+          child: Icon(
+            Icons.list_alt_outlined,
+            size: 135,
+            color: AppColors.blue,
+          ),
+        ),
+        Positioned(
+          right: 23,
+          bottom: 25,
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.blue, width: 3),
+            ),
+            child: const Icon(
+              Icons.eco_rounded,
+              size: 37,
+              color: AppColors.blueText,
+            ),
+          ),
+        ),
+        const Positioned(
+          right: 14,
+          top: 12,
+          child: LifeGlyphIcon(
+            LifeGlyph.sparkle,
+            size: 42,
+            color: AppColors.coral,
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -2550,25 +3173,6 @@ class _EmptyCard extends StatelessWidget {
   );
 }
 
-class _GroupLabel extends StatelessWidget {
-  const _GroupLabel(this.label);
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-    child: Text(
-      label,
-      style: TextStyle(
-        color: context.appMuted,
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
-        letterSpacing: .9,
-      ),
-    ),
-  );
-}
-
 class _TextTabs extends StatelessWidget {
   const _TextTabs({
     required this.labels,
@@ -2632,16 +3236,12 @@ class _SurfaceTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.onTap,
-    this.onLongPress,
-    this.leading,
     this.iconColor,
   });
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
-  final Widget? leading;
   final Color? iconColor;
   @override
   Widget build(BuildContext context) => Padding(
@@ -2650,7 +3250,6 @@ class _SurfaceTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        onLongPress: onLongPress,
         child: Container(
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: context.appBorder)),
@@ -2658,8 +3257,7 @@ class _SurfaceTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 13),
           child: Row(
             children: [
-              leading ??
-                  Icon(icon, size: 18, color: iconColor ?? context.appMuted),
+              Icon(icon, size: 18, color: iconColor ?? context.appMuted),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -3244,8 +3842,8 @@ class _TaskEditorState extends State<_TaskEditor> {
   }
 
   Widget _label(String text) => Padding(
-    padding: const EdgeInsets.only(top: 20, bottom: 8),
-    child: Text(text, style: TextStyle(fontSize: 12, color: context.appMuted)),
+    padding: const EdgeInsets.only(top: 14, bottom: 6),
+    child: Text(text, style: const TextStyle(fontSize: 12)),
   );
 
   @override
@@ -3269,34 +3867,30 @@ class _TaskEditorState extends State<_TaskEditor> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 500),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 28),
               children: [
                 _label('Title'),
                 TextField(
                   key: const Key('task-title-field'),
                   controller: _title,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'What needs to be done?',
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final chosen = await showActivityIconPicker(
-                        context,
-                        selectedId:
-                            _iconId == 'task' && _title.text.trim().isNotEmpty
-                            ? ActivityIconCatalog.guess(_title.text).id
-                            : _iconId,
-                      );
-                      if (chosen != null && mounted) {
-                        setState(() => _iconId = chosen);
-                      }
-                    },
-                    icon: ActivityIcon(id: _iconId),
-                    label: const Text('Choose icon'),
+                    suffixIcon: IconButton(
+                      tooltip: 'Choose task icon',
+                      onPressed: () async {
+                        final chosen = await showActivityIconPicker(
+                          context,
+                          selectedId:
+                              _iconId == 'task' && _title.text.trim().isNotEmpty
+                              ? ActivityIconCatalog.guess(_title.text).id
+                              : _iconId,
+                        );
+                        if (chosen != null && mounted) {
+                          setState(() => _iconId = chosen);
+                        }
+                      },
+                      icon: ActivityIcon(id: _iconId, size: 20),
+                    ),
                   ),
                 ),
                 _label('Date and time'),
@@ -3438,25 +4032,40 @@ class _TaskEditorState extends State<_TaskEditor> {
                     ],
                     onContentInserted: _importInsertedContent,
                   ),
-                  decoration: InputDecoration(
-                    hintText: 'Add a note…',
-                    suffixIcon: SpeechInputButton(controller: _notes),
-                  ),
+                  decoration: const InputDecoration(hintText: 'Add a note…'),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                const SizedBox(height: 7),
+                Row(
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: () => _pickAttachment(imageOnly: true),
-                      icon: const Icon(Icons.image_outlined, size: 18),
-                      label: const Text('Add image'),
+                    Expanded(
+                      child: _TaskNoteControl(
+                        tooltip: 'Add link',
+                        onPressed: _addTaskLink,
+                        child: const Icon(Icons.link_rounded, size: 20),
+                      ),
                     ),
-                    OutlinedButton.icon(
-                      onPressed: () => _pickAttachment(),
-                      icon: const Icon(Icons.attach_file_rounded, size: 18),
-                      label: const Text('Add file'),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _TaskNoteControl(
+                        tooltip: 'Dictate note',
+                        child: SpeechInputButton(controller: _notes),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _TaskNoteControl(
+                        tooltip: 'Add image',
+                        onPressed: () => _pickAttachment(imageOnly: true),
+                        child: const Icon(Icons.image_outlined, size: 20),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _TaskNoteControl(
+                        tooltip: 'Add file',
+                        onPressed: () => _pickAttachment(),
+                        child: const Icon(Icons.attach_file_rounded, size: 20),
+                      ),
                     ),
                   ],
                 ),
@@ -3464,11 +4073,19 @@ class _TaskEditorState extends State<_TaskEditor> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     onTap: () => AttachmentPicker.open(attachment),
-                    leading: Icon(
-                      attachment.kind == LifeAttachmentKind.image
-                          ? Icons.image_outlined
-                          : Icons.insert_drive_file_outlined,
-                    ),
+                    leading:
+                        attachment.kind == LifeAttachmentKind.image &&
+                            File(attachment.path).existsSync()
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(7),
+                            child: Image.file(
+                              File(attachment.path),
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : const Icon(Icons.insert_drive_file_outlined),
                     title: Text(
                       attachment.name,
                       maxLines: 1,
@@ -3506,7 +4123,13 @@ class _TaskEditorState extends State<_TaskEditor> {
                 FilledButton(
                   key: const Key('task-save-button'),
                   onPressed: _saving ? null : _save,
-                  child: Text(_saving ? 'Saving…' : 'Save'),
+                  style: context.isDarkMode
+                      ? null
+                      : FilledButton.styleFrom(
+                          backgroundColor: AppColors.coral,
+                          foregroundColor: Colors.white,
+                        ),
+                  child: Text(_saving ? 'Saving…' : 'Save task'),
                 ),
               ],
             ),
@@ -3530,6 +4153,37 @@ class _TaskEditorState extends State<_TaskEditor> {
     }
   }
 
+  Future<void> _addTaskLink() async {
+    final controller = TextEditingController(text: 'https://');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add link'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(hintText: 'https://example.com'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.isEmpty) return;
+    final separator = _notes.text.trim().isEmpty ? '' : '\n';
+    _notes.text = '${_notes.text}$separator$result';
+    _notes.selection = TextSelection.collapsed(offset: _notes.text.length);
+  }
+
   Future<void> _importInsertedContent(KeyboardInsertedContent content) async {
     try {
       final attachment = await AttachmentPicker.importKeyboardContent(content);
@@ -3543,6 +4197,36 @@ class _TaskEditorState extends State<_TaskEditor> {
       );
     }
   }
+}
+
+class _TaskNoteControl extends StatelessWidget {
+  const _TaskNoteControl({
+    required this.tooltip,
+    required this.child,
+    this.onPressed,
+    this.height = 40,
+  });
+  final String tooltip;
+  final Widget child;
+  final VoidCallback? onPressed;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: Material(
+      color: context.appSoftBlue,
+      borderRadius: BorderRadius.circular(7),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(7),
+        child: SizedBox(
+          height: height,
+          child: Center(child: child),
+        ),
+      ),
+    ),
+  );
 }
 
 Future<void> _showCalendarEditor(

@@ -230,6 +230,7 @@ class AppSettingsController extends ChangeNotifier {
       WidgetGoalScope.parse(_settings.widgetGoalScope);
   ThemeMode get themeMode => appearance.themeMode;
   bool get showAbandoned => _settings.showAbandoned;
+  bool get useSystemThemeColors => _settings.useSystemThemeColors;
   bool get isLoaded => _loaded;
   bool get categoriesEnabled => _settings.categoriesEnabled;
   bool get categoryDragEnabled => _settings.categoryDragEnabled;
@@ -313,6 +314,8 @@ class AppSettingsController extends ChangeNotifier {
       _commit(_settings.copyWith(appearance: value.name));
   Future<void> setAccentColor(AppAccentColor value) =>
       _commit(_settings.copyWith(accentColor: value.name));
+  Future<void> setUseSystemThemeColors(bool value) =>
+      _commit(_settings.copyWith(useSystemThemeColors: value));
   Future<void> setProgressFormat(AppProgressFormat value) =>
       _commit(_settings.copyWith(progressFormat: value.name));
   Future<void> setShowAbandoned(bool value) =>

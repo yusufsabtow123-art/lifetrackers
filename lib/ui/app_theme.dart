@@ -5,27 +5,27 @@ abstract final class AppColors {
   // Light mode is intentionally cool and white rather than a warmed-up
   // inversion of the dark theme. These ink colors keep long-form text
   // readable while the four semantic families carry emphasis.
-  static const navy = Color(0xFF101820);
-  static const navyMuted = Color(0xFF687789);
-  static const blue = Color(0xFF4A9CF0);
-  static const blueText = Color(0xFF2478C5);
-  static const lightGreen = Color(0xFF25B875);
-  static const greenText = Color(0xFF168E57);
-  static const goldText = Color(0xFFA96F00);
-  static const coralText = Color(0xFFE94F48);
+  static const navy = Color(0xFF0A1530);
+  static const navyMuted = Color(0xFF566B8B);
+  static const blue = Color(0xFF1686F7);
+  static const blueText = Color(0xFF086EE8);
+  static const lightGreen = Color(0xFF12AC50);
+  static const greenText = Color(0xFF098B39);
+  static const goldText = Color(0xFFB67800);
+  static const coralText = Color(0xFFF13F3A);
   static const green = Color(0xFF0E9363);
   static const greenDark = Color(0xFF08734D);
   static const warmWhite = Color(0xFFFFFFFF);
   static const panel = Color(0xFFFFFFFF);
   static const lightSurfaceLow = Color(0xFFFCFDFF);
-  static const lightSurface = Color(0xFFF8FAFD);
-  static const lightSurfaceHigh = Color(0xFFF1F5FA);
-  static const lightSurfaceHighest = Color(0xFFE9EFF6);
-  static const border = Color(0xFFDDE5EE);
-  static const softBlue = Color(0xFFE7F3FF);
-  static const softGreen = Color(0xFFE6F8EF);
-  static const softAmber = Color(0xFFFFF5D6);
-  static const softRed = Color(0xFFFFE6E3);
+  static const lightSurface = Color(0xFFF7FAFE);
+  static const lightSurfaceHigh = Color(0xFFF0F5FB);
+  static const lightSurfaceHighest = Color(0xFFE8EFF8);
+  static const border = Color(0xFFD9E5F2);
+  static const softBlue = Color(0xFFE5F2FF);
+  static const softGreen = Color(0xFFE3F7EA);
+  static const softAmber = Color(0xFFFFF3CF);
+  static const softRed = Color(0xFFFFE4E2);
   // Warm, low-contrast layers keep the interface quiet and let content lead.
   static const darkBackground = Color(0xFF0C1114);
   static const darkPanel = Color(0xFF11171B);
@@ -39,7 +39,7 @@ abstract final class AppColors {
   static const yellow = Color(0xFFFFC33D);
   static const success = Color(0xFF45A36B);
   static const danger = Color(0xFFD95A57);
-  static const coral = Color(0xFFFF675F);
+  static const coral = Color(0xFFFF5D58);
 }
 
 /// Shared motion for the app: short, calm transitions that keep spatial
@@ -177,7 +177,7 @@ ThemeData buildAppTheme({
     scaffoldBackgroundColor: brightness == Brightness.dark
         ? AppColors.darkBackground
         : AppColors.warmWhite,
-    fontFamily: 'Segoe UI Variable',
+    fontFamily: 'Roboto',
     visualDensity: VisualDensity.standard,
   );
   return base.copyWith(
@@ -193,9 +193,9 @@ ThemeData buildAppTheme({
     textTheme: base.textTheme.copyWith(
       displaySmall: TextStyle(
         color: scheme.onSurface,
-        fontSize: 26,
+        fontSize: 27,
         height: 1.05,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w800,
         letterSpacing: -0.6,
       ),
       headlineMedium: TextStyle(
@@ -310,12 +310,11 @@ ThemeData buildAppTheme({
               systemNavigationBarIconBrightness: Brightness.dark,
               systemNavigationBarDividerColor: AppColors.border,
             ),
-      shape: Border(
-        bottom: BorderSide(
-          color: brightness == Brightness.dark
-              ? AppColors.darkBorder.withValues(alpha: .72)
-              : AppColors.border,
-        ),
+      titleTextStyle: TextStyle(
+        color: scheme.onSurface,
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -.35,
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(

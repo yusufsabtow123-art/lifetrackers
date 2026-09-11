@@ -264,23 +264,18 @@ class _SimplifiedHeader extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Goals',
-              style: Theme.of(context).textTheme.displaySmall,
-            ),
-          ),
-          _SimplifiedViewSwitcher(onViewChanged: onViewChanged),
-        ],
-      ),
-      const SizedBox(height: 4),
+      Text('Goals', style: Theme.of(context).textTheme.displaySmall),
+      const SizedBox(height: 1),
       Text(
         'Move what matters forward.',
         style: Theme.of(
           context,
         ).textTheme.bodyMedium?.copyWith(color: context.appMuted),
+      ),
+      const SizedBox(height: 12),
+      SizedBox(
+        width: double.infinity,
+        child: _SimplifiedViewSwitcher(onViewChanged: onViewChanged),
       ),
     ],
   );
@@ -293,7 +288,6 @@ class _SimplifiedViewSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 190,
     height: 36,
     padding: const EdgeInsets.all(2),
     decoration: BoxDecoration(
@@ -339,14 +333,16 @@ class _SimplifiedViewChoice extends StatelessWidget {
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(13),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? context.appDangerText : context.appMuted,
-            fontSize: 13,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? context.appDangerText : context.appMuted,
+              fontSize: 13,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            ),
           ),
         ),
       ),
