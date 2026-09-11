@@ -1,17 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 abstract final class AppColors {
-  static const navy = Color(0xFF102A4C);
-  static const navyMuted = Color(0xFF53677F);
+  // Light mode is intentionally cool and white rather than a warmed-up
+  // inversion of the dark theme. These ink colors keep long-form text
+  // readable while the four semantic families carry emphasis.
+  static const navy = Color(0xFF17202A);
+  static const navyMuted = Color(0xFF66717F);
+  static const blue = Color(0xFF3E86C8);
+  static const blueText = Color(0xFF286AA4);
+  static const lightGreen = Color(0xFF36965B);
+  static const greenText = Color(0xFF277A48);
+  static const goldText = Color(0xFF8A620E);
+  static const coralText = Color(0xFFC8463E);
   static const green = Color(0xFF0E9363);
   static const greenDark = Color(0xFF08734D);
-  static const warmWhite = Color(0xFFFBFAF7);
+  static const warmWhite = Color(0xFFFFFFFF);
   static const panel = Color(0xFFFFFFFF);
-  static const border = Color(0xFFE5E1DA);
-  static const softBlue = Color(0xFFEAF2FF);
-  static const softGreen = Color(0xFFE8F5ED);
-  static const softAmber = Color(0xFFFFF1DE);
-  static const softRed = Color(0xFFFFEAE7);
+  static const lightSurfaceLow = Color(0xFFFAFBFD);
+  static const lightSurface = Color(0xFFF6F8FB);
+  static const lightSurfaceHigh = Color(0xFFEEF3F8);
+  static const lightSurfaceHighest = Color(0xFFE7EDF4);
+  static const border = Color(0xFFE1E6EC);
+  static const softBlue = Color(0xFFDCEEFF);
+  static const softGreen = Color(0xFFDDF5E5);
+  static const softAmber = Color(0xFFFFF2C7);
+  static const softRed = Color(0xFFFFE2DE);
   // Warm, low-contrast layers keep the interface quiet and let content lead.
   static const darkBackground = Color(0xFF0C1114);
   static const darkPanel = Color(0xFF11171B);
@@ -89,15 +103,6 @@ Color _bestForeground(Color background) {
   return whiteContrast >= blackContrast ? Colors.white : Colors.black;
 }
 
-Color _complementaryColor(Color accent) {
-  final hsl = HSLColor.fromColor(accent);
-  return hsl
-      .withHue((hsl.hue + 180) % 360)
-      .withSaturation(hsl.saturation.clamp(.35, .68))
-      .withLightness(hsl.lightness.clamp(.38, .56))
-      .toColor();
-}
-
 Color _accessibleAccentText(Color accent, Color background) {
   if (_contrastRatio(accent, background) >= 4.5) return accent;
   final target = background.computeLuminance() > 0.5
@@ -114,9 +119,12 @@ ThemeData buildAppTheme({
   Brightness brightness = Brightness.light,
   Color accentColor = AppColors.coral,
 }) {
-  final complementary = _complementaryColor(accentColor);
   final dark = brightness == Brightness.dark;
-  final effectiveAccent = dark ? accentColor : AppColors.navy;
+  // The approved light compositions use the clear coral itself for controls
+  // and selection—not a darkened brick approximation. Contrast comes from
+  // the foreground placed on the coral, while coral text on white continues
+  // to use the dedicated, darker semantic token below.
+  final effectiveAccent = accentColor;
   final scheme =
       ColorScheme.fromSeed(
         seedColor: accentColor,
@@ -127,24 +135,29 @@ ThemeData buildAppTheme({
       ).copyWith(
         primary: effectiveAccent,
         onPrimary: _bestForeground(effectiveAccent),
-        secondary: dark ? accentColor : complementary,
-        secondaryContainer: dark
-            ? AppColors.darkRaised
-            : const Color(0xFFF0EEE8),
-        onSecondaryContainer: dark ? AppColors.darkText : AppColors.navy,
+        primaryContainer: dark ? AppColors.darkRaised : AppColors.softRed,
+        onPrimaryContainer: dark ? AppColors.darkText : AppColors.coralText,
+        secondary: dark ? accentColor : AppColors.blue,
+        onSecondary: dark ? _bestForeground(accentColor) : Colors.white,
+        secondaryContainer: dark ? AppColors.darkRaised : AppColors.softBlue,
+        onSecondaryContainer: dark ? AppColors.darkText : AppColors.blueText,
+        tertiary: dark ? AppColors.success : AppColors.lightGreen,
+        onTertiary: Colors.white,
+        tertiaryContainer: dark ? AppColors.darkSoftGreen : AppColors.softGreen,
+        onTertiaryContainer: dark ? AppColors.darkText : AppColors.greenText,
         surfaceContainerLowest: dark
             ? AppColors.darkBackground
             : AppColors.warmWhite,
         surfaceContainerLow: dark
             ? AppColors.darkPanel
-            : const Color(0xFFF4F2ED),
-        surfaceContainer: dark ? AppColors.darkRaised : const Color(0xFFF0EEE8),
+            : AppColors.lightSurfaceLow,
+        surfaceContainer: dark ? AppColors.darkRaised : AppColors.lightSurface,
         surfaceContainerHigh: dark
             ? AppColors.darkRaisedHigh
-            : const Color(0xFFEAE7E0),
+            : AppColors.lightSurfaceHigh,
         surfaceContainerHighest: dark
             ? const Color(0xFF292F33)
-            : const Color(0xFFE6E3DC),
+            : AppColors.lightSurfaceHighest,
         onSurface: brightness == Brightness.dark
             ? AppColors.darkText
             : AppColors.navy,
@@ -153,7 +166,10 @@ ThemeData buildAppTheme({
             ? AppColors.darkBorder
             : AppColors.border,
         outlineVariant: dark ? AppColors.darkBorder : AppColors.border,
-        error: AppColors.danger,
+        error: dark ? AppColors.danger : AppColors.coralText,
+        onError: Colors.white,
+        errorContainer: dark ? const Color(0xFF442521) : AppColors.softRed,
+        onErrorContainer: dark ? const Color(0xFFFF9187) : AppColors.coralText,
       );
   final base = ThemeData(
     useMaterial3: true,
@@ -204,11 +220,12 @@ ThemeData buildAppTheme({
       bodySmall: TextStyle(color: scheme.onSurfaceVariant, height: 1.35),
     ),
     cardTheme: CardThemeData(
-      color: scheme.surface,
+      color: dark ? scheme.surface : AppColors.lightSurfaceLow,
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: const BorderRadius.all(Radius.circular(12)),
+        side: BorderSide(color: dark ? Colors.transparent : AppColors.border),
       ),
     ),
     dialogTheme: DialogThemeData(
@@ -220,7 +237,9 @@ ThemeData buildAppTheme({
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: scheme.surfaceContainerHighest,
+      fillColor: dark
+          ? scheme.surfaceContainerHighest
+          : AppColors.lightSurfaceLow,
       contentPadding: EdgeInsets.symmetric(horizontal: 13, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: const BorderRadius.all(Radius.circular(9)),
@@ -229,6 +248,21 @@ ThemeData buildAppTheme({
       enabledBorder: OutlineInputBorder(
         borderRadius: const BorderRadius.all(Radius.circular(9)),
         borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: const BorderRadius.all(Radius.circular(9)),
+        borderSide: BorderSide(
+          color: dark ? accentColor : AppColors.blue,
+          width: 1.5,
+        ),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: const BorderRadius.all(Radius.circular(9)),
+        borderSide: BorderSide(color: scheme.error),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: const BorderRadius.all(Radius.circular(9)),
+        borderSide: BorderSide(color: scheme.error, width: 1.5),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -239,13 +273,19 @@ ThemeData buildAppTheme({
         textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
       ),
     ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: dark ? accentColor : AppColors.coralText,
+        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+    ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(0, 40),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         side: BorderSide(color: scheme.outline),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        foregroundColor: scheme.onSurface,
+        foregroundColor: dark ? scheme.onSurface : AppColors.blueText,
         textStyle: const TextStyle(fontWeight: FontWeight.w600),
       ),
     ),
@@ -256,6 +296,20 @@ ThemeData buildAppTheme({
           ? AppColors.darkBackground
           : AppColors.warmWhite,
       surfaceTintColor: Colors.transparent,
+      foregroundColor: scheme.onSurface,
+      systemOverlayStyle: dark
+          ? SystemUiOverlayStyle.light.copyWith(
+              statusBarColor: Colors.transparent,
+              systemNavigationBarColor: AppColors.darkBackground,
+              systemNavigationBarIconBrightness: Brightness.light,
+              systemNavigationBarDividerColor: AppColors.darkBorder,
+            )
+          : SystemUiOverlayStyle.dark.copyWith(
+              statusBarColor: Colors.transparent,
+              systemNavigationBarColor: Colors.white,
+              systemNavigationBarIconBrightness: Brightness.dark,
+              systemNavigationBarDividerColor: AppColors.border,
+            ),
       shape: Border(
         bottom: BorderSide(
           color: brightness == Brightness.dark
@@ -304,10 +358,73 @@ ThemeData buildAppTheme({
       ),
       trackColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? accentColor
+            ? (dark ? accentColor : AppColors.lightGreen)
             : scheme.surfaceContainerHighest,
       ),
       trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+    ),
+    checkboxTheme: CheckboxThemeData(
+      fillColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? (dark ? accentColor : AppColors.lightGreen)
+            : Colors.transparent,
+      ),
+      checkColor: const WidgetStatePropertyAll(Colors.white),
+      side: BorderSide(color: scheme.onSurfaceVariant, width: 1.4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    ),
+    radioTheme: RadioThemeData(
+      fillColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? scheme.primary
+            : scheme.onSurfaceVariant,
+      ),
+    ),
+    iconTheme: IconThemeData(
+      color: dark ? scheme.onSurface : AppColors.blueText,
+    ),
+    listTileTheme: ListTileThemeData(
+      iconColor: dark ? scheme.onSurfaceVariant : AppColors.blueText,
+      textColor: scheme.onSurface,
+    ),
+    chipTheme: base.chipTheme.copyWith(
+      backgroundColor: dark ? scheme.surfaceContainer : AppColors.lightSurface,
+      selectedColor: dark
+          ? accentColor.withValues(alpha: .18)
+          : AppColors.softRed,
+      side: BorderSide(color: scheme.outlineVariant),
+      labelStyle: TextStyle(color: scheme.onSurfaceVariant),
+      secondaryLabelStyle: TextStyle(
+        color: dark ? scheme.onSurface : AppColors.coralText,
+        fontWeight: FontWeight.w600,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: dark ? AppColors.darkRaised : AppColors.lightSurfaceLow,
+      surfaceTintColor: Colors.transparent,
+      elevation: dark ? 8 : 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+    ),
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: scheme.primary,
+      linearTrackColor: dark
+          ? AppColors.darkRaisedHigh
+          : AppColors.lightSurfaceHigh,
+      circularTrackColor: dark
+          ? AppColors.darkRaisedHigh
+          : AppColors.lightSurfaceHigh,
+    ),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: scheme.primary,
+      foregroundColor: scheme.onPrimary,
+      elevation: dark ? 5 : 2,
+      focusElevation: dark ? 6 : 3,
+      hoverElevation: dark ? 6 : 3,
+      shape: const CircleBorder(),
     ),
   );
 }
@@ -323,15 +440,16 @@ extension AppThemeContext on BuildContext {
   Color get appSoftGreen =>
       isDarkMode ? AppColors.darkSoftGreen : AppColors.softGreen;
   Color get appSoftBlue {
+    if (!isDarkMode) return AppColors.softBlue;
     final scheme = Theme.of(this).colorScheme;
     return Color.alphaBlend(
-      scheme.secondary.withValues(alpha: isDarkMode ? .22 : .12),
+      scheme.secondary.withValues(alpha: .22),
       scheme.surface,
     );
   }
 
   Color get appPending => AppColors.yellow;
-  Color get appSuccess => AppColors.success;
+  Color get appSuccess => isDarkMode ? AppColors.success : AppColors.lightGreen;
   Color get appDanger => AppColors.danger;
 
   Color get appSoftAmber =>
@@ -339,17 +457,19 @@ extension AppThemeContext on BuildContext {
   Color get appSoftRed =>
       isDarkMode ? const Color(0xFF442521) : AppColors.softRed;
   Color get appGreenText {
+    if (!isDarkMode) return AppColors.greenText;
     final scheme = Theme.of(this).colorScheme;
     return _accessibleAccentText(AppColors.success, scheme.surface);
   }
 
   Color get appBlueText {
+    if (!isDarkMode) return AppColors.blueText;
     final scheme = Theme.of(this).colorScheme;
     return _accessibleAccentText(scheme.secondary, scheme.surface);
   }
 
   Color get appWarningText =>
-      isDarkMode ? const Color(0xFFFFC46E) : const Color(0xFFB96500);
+      isDarkMode ? const Color(0xFFFFC46E) : AppColors.goldText;
   Color get appDangerText =>
-      isDarkMode ? const Color(0xFFFF9187) : const Color(0xFFC73B2E);
+      isDarkMode ? const Color(0xFFFF9187) : AppColors.coralText;
 }

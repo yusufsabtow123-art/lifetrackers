@@ -121,6 +121,40 @@ void main() {
     expect(settings.progressFormat, 'both');
   });
 
+  test('light theme uses the approved white semantic palette', () {
+    final theme = buildAppTheme(accentColor: AppColors.coral);
+    final scheme = theme.colorScheme;
+
+    expect(theme.brightness, Brightness.light);
+    expect(theme.scaffoldBackgroundColor, Colors.white);
+    expect(scheme.surface, Colors.white);
+    expect(scheme.surfaceContainerLow, AppColors.lightSurfaceLow);
+    expect(scheme.surfaceContainer, AppColors.lightSurface);
+    expect(scheme.surfaceContainerHigh, AppColors.lightSurfaceHigh);
+    expect(scheme.secondaryContainer, AppColors.softBlue);
+    expect(scheme.tertiaryContainer, AppColors.softGreen);
+    expect(scheme.primaryContainer, AppColors.softRed);
+    expect(
+      theme.switchTheme.trackColor!.resolve({WidgetState.selected}),
+      AppColors.lightGreen,
+    );
+    expect(
+      _contrastRatio(scheme.onSurface, theme.scaffoldBackgroundColor),
+      greaterThanOrEqualTo(7),
+    );
+  });
+
+  test('dark theme foundation remains unchanged', () {
+    final theme = buildAppTheme(
+      brightness: Brightness.dark,
+      accentColor: AppColors.coral,
+    );
+
+    expect(theme.scaffoldBackgroundColor, AppColors.darkBackground);
+    expect(theme.colorScheme.surface, AppColors.darkPanel);
+    expect(theme.colorScheme.onSurface, AppColors.darkText);
+  });
+
   test('all 15 accent colors are balanced into three accessible groups', () {
     expect(AppAccentColor.values, hasLength(15));
     for (final group in AppAccentGroup.values) {

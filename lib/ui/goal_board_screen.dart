@@ -240,7 +240,7 @@ class _DesktopSidebar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: context.isDarkMode
                       ? AppColors.greenDark
-                      : AppColors.navy,
+                      : AppColors.blueText,
                   borderRadius: BorderRadius.circular(11),
                 ),
                 child: const Icon(

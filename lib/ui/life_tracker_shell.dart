@@ -2228,6 +2228,7 @@ class _MorePage extends StatelessWidget {
         const _GroupLabel('SPACES'),
         _SurfaceTile(
           icon: Icons.group_outlined,
+          iconColor: context.isDarkMode ? null : AppColors.blueText,
           title: 'Spaces and people',
           subtitle: 'Personal and Shared Space',
           onTap: onSpaces,
@@ -2236,18 +2237,21 @@ class _MorePage extends StatelessWidget {
         const _GroupLabel('TOOLS'),
         _SurfaceTile(
           icon: Icons.history_rounded,
+          iconColor: context.isDarkMode ? null : AppColors.greenText,
           title: 'Log',
           subtitle: 'Completion notes and your progress history',
           onTap: onLog,
         ),
         _SurfaceTile(
           icon: Icons.auto_awesome_outlined,
+          iconColor: context.isDarkMode ? null : AppColors.blueText,
           title: 'AI',
           subtitle: 'Work in progress',
           onTap: onAi,
         ),
         _SurfaceTile(
           icon: Icons.settings_outlined,
+          iconColor: context.isDarkMode ? null : AppColors.coralText,
           title: 'Settings',
           subtitle: 'Appearance, notifications, goals, widgets, and files',
           onTap: onSettings,
@@ -2256,6 +2260,7 @@ class _MorePage extends StatelessWidget {
         const _GroupLabel('YOUR DATA'),
         _SurfaceTile(
           icon: Icons.description_outlined,
+          iconColor: context.isDarkMode ? null : AppColors.blueText,
           title: 'Tasks and calendar file',
           subtitle: lifeStore.storagePath,
         ),
@@ -2517,6 +2522,7 @@ class _SurfaceTile extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.leading,
+    this.iconColor,
   });
   final IconData icon;
   final String title;
@@ -2524,6 +2530,7 @@ class _SurfaceTile extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final Widget? leading;
+  final Color? iconColor;
   @override
   Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.zero,
@@ -2539,7 +2546,8 @@ class _SurfaceTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 13),
           child: Row(
             children: [
-              leading ?? Icon(icon, size: 18, color: context.appMuted),
+              leading ??
+                  Icon(icon, size: 18, color: iconColor ?? context.appMuted),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

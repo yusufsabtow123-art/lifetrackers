@@ -100,30 +100,35 @@ class SettingsPage extends StatelessWidget {
               children: [
                 _ReferenceSettingRow(
                   icon: Icons.light_mode_outlined,
+                  iconColor: context.isDarkMode ? null : AppColors.goldText,
                   title: 'Appearance',
                   value: settings.appearance.name,
                   onTap: entries[0].onTap,
                 ),
                 _ReferenceSettingRow(
                   icon: Icons.notifications_outlined,
+                  iconColor: context.isDarkMode ? null : AppColors.coralText,
                   title: 'Notifications',
                   value: settings.notificationsEnabled ? 'On' : 'Off',
                   onTap: entries[4].onTap,
                 ),
                 _ReferenceSettingRow(
                   icon: Icons.calendar_today_outlined,
+                  iconColor: context.isDarkMode ? null : AppColors.greenText,
                   title: 'Calendar',
                   value: settings.salahEnabled ? 'Salah on' : 'Salah off',
                   onTap: entries[1].onTap,
                 ),
                 _ReferenceSettingRow(
                   icon: Icons.folder_outlined,
+                  iconColor: context.isDarkMode ? null : AppColors.blueText,
                   title: 'Data',
                   value: 'On this device',
                   onTap: entries[7].onTap,
                 ),
                 _ReferenceSettingRow(
                   icon: Icons.accessibility_new_rounded,
+                  iconColor: context.isDarkMode ? null : AppColors.blueText,
                   title: 'Accessibility',
                   value: 'Uses device settings',
                   onTap: () => _open(
@@ -140,18 +145,21 @@ class SettingsPage extends StatelessWidget {
                 const SizedBox(height: 8),
                 _ReferenceSettingRow(
                   icon: entries[2].icon,
+                  iconColor: context.isDarkMode ? null : AppColors.coralText,
                   title: 'Board and categories',
                   value: '',
                   onTap: entries[2].onTap,
                 ),
                 _ReferenceSettingRow(
                   icon: entries[3].icon,
+                  iconColor: context.isDarkMode ? null : AppColors.blueText,
                   title: 'Opened goals',
                   value: '',
                   onTap: entries[3].onTap,
                 ),
                 _ReferenceSettingRow(
                   icon: entries[6].icon,
+                  iconColor: context.isDarkMode ? null : AppColors.blueText,
                   title: 'Android widgets',
                   value: '',
                   onTap: entries[6].onTap,
@@ -299,11 +307,13 @@ class _ReferenceSettingRow extends StatelessWidget {
     required this.title,
     required this.value,
     required this.onTap,
+    this.iconColor,
   });
   final IconData icon;
   final String title;
   final String value;
   final VoidCallback onTap;
+  final Color? iconColor;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 2),
@@ -317,7 +327,7 @@ class _ReferenceSettingRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(
             children: [
-              Icon(icon, size: 19, color: context.appText),
+              Icon(icon, size: 19, color: iconColor ?? context.appText),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(title, style: const TextStyle(fontSize: 14)),
@@ -441,7 +451,7 @@ class _AppearancePreview extends StatelessWidget {
       decoration: BoxDecoration(
         color: appearance == AppAppearance.dark
             ? const Color(0xFF101518)
-            : const Color(0xFFF4F3EF),
+            : AppColors.lightSurface,
         borderRadius: BorderRadius.circular(7),
         border: Border.all(
           color: selected ? AppColors.coral : context.appBorder,
@@ -457,7 +467,7 @@ class _AppearancePreview extends StatelessWidget {
                 height: 22,
                 color: appearance == AppAppearance.dark
                     ? const Color(0xFF1B2226)
-                    : const Color(0xFFE1E2DF),
+                    : AppColors.softBlue,
               ),
               const SizedBox(width: 3),
               Expanded(
